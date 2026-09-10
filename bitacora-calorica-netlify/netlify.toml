@@ -5,6 +5,9 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions."daily-summary"]
+  schedule = "59 2 * * *"
+
 [[headers]]
   for = "/sw.js"
   [headers.values]

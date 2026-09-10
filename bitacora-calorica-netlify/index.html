@@ -488,6 +488,15 @@
       <div class="error-box" id="whoop-error"></div>
       <div class="hint">Trae tus entrenamientos registrados por el Whoop y los suma como actividad del día correspondiente, para el cálculo de déficit.</div>
     </div>
+
+    <div class="panel">
+      <h3>Notificaciones diarias</h3>
+      <div id="push-status"></div>
+      <button class="btn" id="push-enable-btn" style="margin-top:10px;">Activar notificaciones</button>
+      <button class="btn secondary" id="push-disable-btn" style="margin-top:10px; display:none;">Desactivar</button>
+      <div class="error-box" id="push-error"></div>
+      <div class="hint">Todos los días a las 23:59 te mandamos un resumen de cómo te fue (comida, entrenamiento, y recuperación/sueño si tenés Whoop conectado con esos permisos) y una recomendación para mañana.</div>
+    </div>
   </section>
 
   <div class="error-box" id="global-error"></div>
@@ -502,6 +511,7 @@ const APP_TOKEN = '2ENJpWQa7ySYjuD8vAtErT34bIfv32J7'; // debe coincidir con la v
 const WHOOP_CLIENT_ID = '58561d32-d94f-4654-8b76-106f5ae2d6a4';
 const WHOOP_REDIRECT_URI = 'https://nutrym.netlify.app/';
 const WHOOP_AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
+const VAPID_PUBLIC_KEY = 'BArkpWKhXXgSvBOlkgCizD6OxvgzLFBpXZGeLKkhtPPB8Nf5NJKCgRFWH9KEMsHSkRfpVdICESVdhvqpBpDe8wo';
 const JSONBIN_BASE = 'https://api.jsonbin.io/v3/b/';
 
 const DEFAULT_SETTINGS = { tdeeSedentario: 2200, tdeeIntermedio: 2350, tdeeActivo: 2500, deficitGoal: 500, heightCm: null };
@@ -558,7 +568,7 @@ const ROUTINE_TEMPLATES = [
 /* ====================== ESTADO ====================== */
 let state = {
   nutrition: { settings: DEFAULT_SETTINGS, days: {} },
-  gym: { exercises: DEFAULT_EXERCISES, logs: {}, currentRoutine: null, routineHistory: [], sportLogs: {}, whoop: null }
+  gym: { exercises: DEFAULT_EXERCISES, logs: {}, currentRoutine: null, routineHistory: [], sportLogs: {}, whoop: null, pushSubscription: null }
 };
 let selectedDate = todayStr();
 let activeTab = 'dia';
@@ -721,6 +731,7 @@ async function loadAll() {
   if (state.gym.routineHistory === undefined) state.gym.routineHistory = [];
   if (!state.gym.sportLogs) state.gym.sportLogs = {};
   if (state.gym.whoop === undefined) state.gym.whoop = null;
+  if (state.gym.pushSubscription === undefined) state.gym.pushSubscription = null;
   if (!state.gym.whoopImportedIds) state.gym.whoopImportedIds = [];
 }
 
@@ -1304,6 +1315,7 @@ function renderAll() {
   renderCarga();
   renderConfig();
   renderWhoopStatus();
+  renderPushStatus();
 }
 
 /* ====================== IA: fotos y rutina (vía función serverless) ====================== */
@@ -1326,7 +1338,7 @@ function whoopStartConnect() {
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', WHOOP_CLIENT_ID);
   url.searchParams.set('redirect_uri', WHOOP_REDIRECT_URI);
-  url.searchParams.set('scope', 'read:workout offline');
+  url.searchParams.set('scope', 'read:workout read:recovery read:sleep offline');
   url.searchParams.set('state', state32);
   window.location.href = url.toString();
 }
@@ -1412,6 +1424,67 @@ async function whoopSync() {
     errorBox.classList.add('show');
   }
   btn.disabled = false; btn.textContent = 'Sincronizar entrenamientos';
+}
+
+/* ====================== NOTIFICACIONES PUSH ====================== */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+async function enablePushNotifications() {
+  const statusBox = document.getElementById('push-status');
+  const errorBox = document.getElementById('push-error');
+  errorBox.classList.remove('show');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    errorBox.textContent = 'Este navegador no soporta notificaciones push.';
+    errorBox.classList.add('show');
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      errorBox.textContent = 'No se otorgó permiso de notificaciones. Podés habilitarlo desde los ajustes de Safari/iOS para esta app.';
+      errorBox.classList.add('show');
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    let sub = await registration.pushManager.getSubscription();
+    if (!sub) {
+      sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    state.gym.pushSubscription = sub.toJSON();
+    await persistGym();
+    renderPushStatus();
+  } catch (err) {
+    errorBox.textContent = 'No se pudo activar: ' + err.message;
+    errorBox.classList.add('show');
+  }
+}
+function disablePushNotifications() {
+  state.gym.pushSubscription = null;
+  persistGym();
+  renderPushStatus();
+}
+function renderPushStatus() {
+  const statusBox = document.getElementById('push-status');
+  const enableBtn = document.getElementById('push-enable-btn');
+  const disableBtn = document.getElementById('push-disable-btn');
+  if (state.gym.pushSubscription) {
+    statusBox.innerHTML = '<div class="entry-meta">Notificaciones activadas.</div>';
+    enableBtn.style.display = 'none';
+    disableBtn.style.display = 'inline-block';
+  } else {
+    statusBox.innerHTML = '<div class="entry-meta">No activadas.</div>';
+    enableBtn.style.display = 'inline-block';
+    disableBtn.style.display = 'none';
+  }
 }
 
 function renderWhoopStatus() {
@@ -1964,6 +2037,8 @@ function wireEvents() {
     persistGym();
     renderWhoopStatus();
   };
+  document.getElementById('push-enable-btn').onclick = enablePushNotifications;
+  document.getElementById('push-disable-btn').onclick = disablePushNotifications;
 }
 function addSetRow() {
   const container = document.getElementById('sets-container');
