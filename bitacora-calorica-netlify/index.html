@@ -45,7 +45,7 @@
   .wrap { max-width: 780px; margin: 0 auto; padding: 16px 16px 32px; }
 
   .header {
-    display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;
     background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
     padding: 16px 18px; margin-bottom: 14px;
     box-shadow: 0 1px 2px rgba(20,24,28,0.04);
@@ -68,9 +68,9 @@
   .hero-number.pos { color: #4FBE8B; }
   .hero-number.neg { color: #E38A94; }
   .hero-sub { font-size: 13px; color: #9BA3AA; margin-top: 10px; font-weight: 500; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; row-gap: 16px; margin-top: 22px; border-top: 1px solid #262B2F; padding-top: 18px; }
-  .stats > div:nth-child(odd) { border-right: 1px solid #262B2F; padding-right: 16px; }
-  .stats > div:nth-child(-n+2) { border-bottom: 1px solid #262B2F; padding-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 14px; row-gap: 16px; margin-top: 22px; border-top: 1px solid #262B2F; padding-top: 18px; }
+  .stats > div:not(:nth-child(3n)) { border-right: 1px solid #262B2F; padding-right: 12px; }
+  .stats > div:nth-child(-n+3) { border-bottom: 1px solid #262B2F; padding-bottom: 16px; }
   .stat-label { font-size: 11px; color: #8B939A; font-weight: 500; }
   .stat-value { font-size: 19px; font-weight: 800; margin-top: 4px; font-family: 'Manrope', sans-serif; color: var(--bg); font-variant-numeric: tabular-nums; }
 
@@ -200,24 +200,25 @@
     <div class="hero-number" id="hero-number"></div>
     <div class="hero-sub" id="hero-sub"></div>
     <div class="stats">
-      <div><div class="stat-label">Consumido</div><div class="stat-value" id="stat-intake"></div></div>
-      <div><div class="stat-label">Quemado (actividad)</div><div class="stat-value" id="stat-burned"></div></div>
+      <div><div class="stat-label">Comida</div><div class="stat-value" id="stat-intake"></div></div>
+      <div><div class="stat-label">Actividad</div><div class="stat-value" id="stat-burned"></div></div>
+      <div><div class="stat-label">Deporte</div><div class="stat-value" id="stat-deporte"></div></div>
       <div><div class="stat-label">Meta de ingesta</div><div class="stat-value" id="stat-target"></div></div>
       <div><div class="stat-label">Mantenimiento (TDEE)</div><div class="stat-value" id="stat-tdee"></div></div>
+      <div><div class="stat-label">Whoop</div><div class="stat-value" id="stat-whoop" style="font-size:13px;"></div></div>
     </div>
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-tab="dia">Día</button>
-    <button class="tab" data-tab="historial">Historial</button>
-    <button class="tab" data-tab="gimnasio">Gimnasio</button>
-    <button class="tab" data-tab="deporte">Deporte</button>
+    <button class="tab active" data-tab="alimentacion">Alimentación</button>
+    <button class="tab" data-tab="actividad">Actividad</button>
     <button class="tab" data-tab="nutria">NutrIA</button>
+    <button class="tab" data-tab="historial">Historial</button>
     <button class="tab" data-tab="config">Configuración</button>
   </div>
 
-  <!-- DÍA -->
-  <section id="tab-dia" class="tabsection">
+  <!-- ALIMENTACIÓN -->
+  <section id="tab-alimentacion" class="tabsection">
     <div class="panel">
       <h3>Comidas</h3>
       <div id="foods-list"></div>
@@ -269,43 +270,167 @@
       <div class="error-box" id="suggest-error"></div>
       <div id="suggest-results"></div>
     </div>
+  </section>
 
-    <div class="panel">
-      <h3>Actividad</h3>
-      <div id="activities-list"></div>
-      <form id="activity-form">
-        <div class="form-row">
-          <div class="field grow"><label>Actividad</label><input type="text" id="act-name" placeholder="Ej: running, gimnasio, pádel"></div>
-          <div class="field small"><label>Kcal quemadas</label><input type="number" min="0" id="act-cal" placeholder="0"></div>
-          <div class="field small"><label>Min (opc.)</label><input type="number" min="0" id="act-duration"></div>
-          <button type="submit" class="btn">Agregar</button>
-        </div>
-      </form>
-      <div class="hint" id="act-cal-hint" style="margin-top:6px;"></div>
+  <!-- ACTIVIDAD -->
+  <section id="tab-actividad" class="tabsection" style="display:none;">
+    <div class="subtabs" id="actividad-outer-subtabs">
+      <button class="subtab active" data-actividadtab="gimnasio">Gimnasio</button>
+      <button class="subtab" data-actividadtab="deporte">Deporte</button>
     </div>
 
-    <div class="panel">
-      <h3>Peso corporal</h3>
-      <div id="weight-today-view"></div>
-      <form id="weight-form" class="form-row" style="margin-top:0;">
-        <div class="field small"><label>Peso (kg)</label><input type="number" min="0" step="0.1" id="weight-kg" placeholder="0.0"></div>
-        <button type="submit" class="btn">Registrar</button>
-      </form>
-      <div class="hint">Con una carga por semana alcanza — no hace falta pesarte todos los días.</div>
+    <div id="actividad-gimnasio" class="actividadtabsection">
+      <div class="subtabs">
+        <button class="subtab active" data-gymtab="registrar">Registrar</button>
+        <button class="subtab" data-gymtab="rutina">Rutina semanal</button>
+        <button class="subtab" data-gymtab="progreso">Progreso</button>
+      </div>
+
+      <div id="gym-registrar" class="gymtabsection">
+        <div class="panel">
+          <h3 id="gym-log-title">Entrenamiento</h3>
+          <div id="gym-log-list"></div>
+          <div id="gym-day-total"></div>
+          <form id="gym-form" style="margin-top:14px;">
+            <div class="form-row" style="margin-top:0;">
+              <div class="field grow">
+                <label>Ejercicio</label>
+                <input type="text" id="gym-exercise-name" list="exercise-list" placeholder="Ej: sentadilla">
+                <datalist id="exercise-list"></datalist>
+              </div>
+              <div class="field">
+                <label>Grupo (si es nuevo)</label>
+                <select id="gym-group">
+                  <option>Piernas</option><option>Pecho</option><option>Espalda</option>
+                  <option>Hombros</option><option>Brazos</option><option>Core</option><option>Otro</option>
+                </select>
+              </div>
+            </div>
+            <div id="sets-container" style="margin-top:10px;"></div>
+            <button type="button" class="linkbtn" id="add-set">+ agregar serie</button>
+            <div class="field grow" style="margin-top:10px;">
+              <label>Nota (opcional)</label>
+              <input type="text" id="gym-note" placeholder="Ej: sentí molestia en el hombro derecho">
+            </div>
+            <button type="submit" class="btn" style="margin-top:12px;">Guardar ejercicio</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="gym-rutina" class="gymtabsection" style="display:none;">
+        <div class="panel">
+          <div class="routine-header">
+            <h3 style="margin:0;">Armar rutina de la semana</h3>
+          </div>
+          <div class="form-row" style="margin-top:0;">
+            <div class="field small"><label>Días por semana</label><input type="number" id="routine-days-count" min="1" max="7" value="4"></div>
+          </div>
+          <div id="routine-day-pickers" style="margin-top:14px;"></div>
+          <button class="btn slate" id="generate-routine-btn" style="margin-top:14px;">Generar rutina con esta configuración</button>
+          <div class="error-box" id="routine-error"></div>
+          <div id="routine-content"></div>
+        </div>
+      </div>
+
+      <div id="gym-progreso" class="gymtabsection" style="display:none;">
+        <div class="panel">
+          <h3>Progreso por ejercicio</h3>
+          <div class="field grow" style="margin-bottom:14px;">
+            <label>Ejercicio</label>
+            <select id="progress-exercise"><option value="">Elegí un ejercicio</option></select>
+          </div>
+          <div id="progress-empty" class="empty">Elegí un ejercicio para ver su evolución de cargas.</div>
+          <div id="progress-content" style="display:none;">
+            <div class="chart-title">Peso máximo y 1RM estimado por sesión</div>
+            <canvas id="chart-progress-weight" height="140"></canvas>
+            <div class="chart-title" style="margin-top:22px;">Volumen total por sesión (reps × peso)</div>
+            <canvas id="chart-progress-volume" height="140"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="panel">
-      <h3>Composición corporal (estimado)</h3>
-      <div id="bodycomp-today-view"></div>
-      <form id="bodycomp-form">
-        <div class="form-row" style="margin-top:0;">
-          <div class="field small"><label>Cuello (cm)</label><input type="number" min="0" step="0.1" id="bc-neck"></div>
-          <div class="field small"><label>Cintura (cm)</label><input type="number" min="0" step="0.1" id="bc-waist"></div>
-          <button type="submit" class="btn">Calcular y registrar</button>
+    <div id="actividad-deporte" class="actividadtabsection" style="display:none;">
+      <div class="panel">
+        <h3>Otra actividad</h3>
+        <div class="hint" style="margin-top:0;">Para lo que no es ni gimnasio ni un deporte armado — caminata, pileta libre, etc.</div>
+        <div id="activities-list"></div>
+        <form id="activity-form">
+          <div class="form-row">
+            <div class="field grow"><label>Actividad</label><input type="text" id="act-name" placeholder="Ej: caminata, pileta libre"></div>
+            <div class="field small"><label>Kcal quemadas</label><input type="number" min="0" id="act-cal" placeholder="0"></div>
+            <div class="field small"><label>Min (opc.)</label><input type="number" min="0" id="act-duration"></div>
+            <button type="submit" class="btn">Agregar</button>
+          </div>
+        </form>
+        <div class="hint" id="act-cal-hint" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Whoop — recovery y sueño</h3>
+        <div id="whoop-vitals-status"></div>
+        <button type="button" class="btn secondary" id="whoop-vitals-refresh-btn" style="margin-top:10px;">Actualizar</button>
+        <div class="error-box" id="whoop-vitals-error"></div>
+        <div id="whoop-vitals-content" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="subtabs">
+        <button class="subtab active" data-deportetab="registrar">Registrar</button>
+        <button class="subtab" data-deportetab="carga">Carga semanal</button>
+      </div>
+
+      <div id="deporte-registrar" class="deportetabsection">
+        <div class="panel">
+          <h3 id="deporte-log-title">Deporte del día</h3>
+          <div id="deporte-log-list"></div>
+          <div id="deporte-day-total"></div>
+          <form id="deporte-form" style="margin-top:14px;">
+            <div class="form-row" style="margin-top:0;">
+              <div class="field grow">
+                <label>Deporte</label>
+                <input type="text" id="deporte-name" list="deporte-list" placeholder="Ej: pádel, fútbol, running">
+                <datalist id="deporte-list"></datalist>
+              </div>
+              <div class="field small">
+                <label>Duración (min)</label>
+                <input type="number" min="0" id="deporte-duration" placeholder="60">
+              </div>
+              <div class="field">
+                <label>Intensidad (RPE)</label>
+                <select id="deporte-rpe">
+                  <option value="1">1 — muy liviano</option>
+                  <option value="2">2</option>
+                  <option value="3">3 — liviano</option>
+                  <option value="4">4</option>
+                  <option value="5">5 — moderado</option>
+                  <option value="6">6</option>
+                  <option value="7" selected>7 — intenso</option>
+                  <option value="8">8</option>
+                  <option value="9">9 — muy intenso</option>
+                  <option value="10">10 — esfuerzo máximo</option>
+                </select>
+              </div>
+            </div>
+            <div class="field grow" style="margin-top:10px;">
+              <label>Nota (opcional)</label>
+              <input type="text" id="deporte-note" placeholder="Ej: ganamos 6-3, sentí bien las piernas">
+            </div>
+            <button type="submit" class="btn" style="margin-top:12px;">Guardar sesión</button>
+          </form>
         </div>
-      </form>
-      <div id="bodycomp-result"></div>
-      <div class="hint">Estimación con la fórmula de la Marina de EE.UU. (cuello, cintura, altura) — margen de error típico de ±3-4% contra un DEXA. No calcula músculo ni hueso por separado; eso solo lo mide un estudio médico.</div>
+      </div>
+
+      <div id="deporte-carga" class="deportetabsection" style="display:none;">
+        <div class="panel">
+          <h3>Carga semanal (duración × intensidad)</h3>
+          <div id="carga-empty" class="empty">Registrá sesiones de deporte para ver tu carga semanal acá.</div>
+          <div id="carga-content" style="display:none;">
+            <canvas id="chart-carga" height="160"></canvas>
+            <div class="chart-title" style="margin-top:18px;">Esta semana por deporte</div>
+            <div id="carga-breakdown"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -325,8 +450,14 @@
 
     <div class="panel">
       <h3>Peso corporal</h3>
-      <div id="weight-empty" class="empty">Registrá tu peso en la pestaña Día para ver la evolución acá.</div>
-      <div id="weight-content" style="display:none;">
+      <div id="weight-today-view"></div>
+      <form id="weight-form" class="form-row" style="margin-top:0;">
+        <div class="field small"><label>Peso (kg)</label><input type="number" min="0" step="0.1" id="weight-kg" placeholder="0.0"></div>
+        <button type="submit" class="btn">Registrar</button>
+      </form>
+      <div class="hint">Con una carga por semana alcanza — no hace falta pesarte todos los días.</div>
+      <div id="weight-empty" class="empty" style="margin-top:14px;">Registrá tu peso para ver la evolución acá.</div>
+      <div id="weight-content" style="display:none; margin-top:14px;">
         <div id="weight-comparison" class="coach-note"></div>
         <div class="chart-title">Peso registrado vs. peso esperado según tu déficit acumulado</div>
         <canvas id="chart-weight" height="140"></canvas>
@@ -334,9 +465,19 @@
     </div>
 
     <div class="panel">
-      <h3>Grasa corporal (estimado)</h3>
-      <div id="bodycomp-empty" class="empty">Registrá cuello y cintura en la pestaña Día para ver la evolución acá.</div>
-      <div id="bodycomp-content" style="display:none;">
+      <h3>Composición corporal (estimado)</h3>
+      <div id="bodycomp-today-view"></div>
+      <form id="bodycomp-form">
+        <div class="form-row" style="margin-top:0;">
+          <div class="field small"><label>Cuello (cm)</label><input type="number" min="0" step="0.1" id="bc-neck"></div>
+          <div class="field small"><label>Cintura (cm)</label><input type="number" min="0" step="0.1" id="bc-waist"></div>
+          <button type="submit" class="btn">Calcular y registrar</button>
+        </div>
+      </form>
+      <div id="bodycomp-result"></div>
+      <div class="hint">Estimación con la fórmula de la Marina de EE.UU. (cuello, cintura, altura) — margen de error típico de ±3-4% contra un DEXA. No calcula músculo ni hueso por separado; eso solo lo mide un estudio médico.</div>
+      <div id="bodycomp-empty" class="empty" style="margin-top:14px;">Registrá cuello y cintura para ver la evolución acá.</div>
+      <div id="bodycomp-content" style="display:none; margin-top:14px;">
         <canvas id="chart-bodyfat" height="140"></canvas>
       </div>
     </div>
@@ -345,139 +486,6 @@
       <h3>Resúmenes diarios</h3>
       <div id="summaries-empty" class="empty">Todavía no se generó ningún resumen diario.</div>
       <div id="summaries-list"></div>
-    </div>
-  </section>
-
-  <!-- GIMNASIO -->
-  <section id="tab-gimnasio" class="tabsection" style="display:none;">
-    <div class="subtabs">
-      <button class="subtab active" data-gymtab="registrar">Registrar</button>
-      <button class="subtab" data-gymtab="rutina">Rutina semanal</button>
-      <button class="subtab" data-gymtab="progreso">Progreso</button>
-    </div>
-
-    <div id="gym-registrar" class="gymtabsection">
-      <div class="panel">
-        <h3 id="gym-log-title">Entrenamiento</h3>
-        <div id="gym-log-list"></div>
-        <div id="gym-day-total"></div>
-        <form id="gym-form" style="margin-top:14px;">
-          <div class="form-row" style="margin-top:0;">
-            <div class="field grow">
-              <label>Ejercicio</label>
-              <input type="text" id="gym-exercise-name" list="exercise-list" placeholder="Ej: sentadilla">
-              <datalist id="exercise-list"></datalist>
-            </div>
-            <div class="field">
-              <label>Grupo (si es nuevo)</label>
-              <select id="gym-group">
-                <option>Piernas</option><option>Pecho</option><option>Espalda</option>
-                <option>Hombros</option><option>Brazos</option><option>Core</option><option>Otro</option>
-              </select>
-            </div>
-          </div>
-          <div id="sets-container" style="margin-top:10px;"></div>
-          <button type="button" class="linkbtn" id="add-set">+ agregar serie</button>
-          <div class="field grow" style="margin-top:10px;">
-            <label>Nota (opcional)</label>
-            <input type="text" id="gym-note" placeholder="Ej: sentí molestia en el hombro derecho">
-          </div>
-          <button type="submit" class="btn" style="margin-top:12px;">Guardar ejercicio</button>
-        </form>
-      </div>
-    </div>
-
-    <div id="gym-rutina" class="gymtabsection" style="display:none;">
-      <div class="panel">
-        <div class="routine-header">
-          <h3 style="margin:0;">Armar rutina de la semana</h3>
-        </div>
-        <div class="form-row" style="margin-top:0;">
-          <div class="field small"><label>Días por semana</label><input type="number" id="routine-days-count" min="1" max="7" value="4"></div>
-        </div>
-        <div id="routine-day-pickers" style="margin-top:14px;"></div>
-        <button class="btn slate" id="generate-routine-btn" style="margin-top:14px;">Generar rutina con esta configuración</button>
-        <div class="error-box" id="routine-error"></div>
-        <div id="routine-content"></div>
-      </div>
-    </div>
-
-    <div id="gym-progreso" class="gymtabsection" style="display:none;">
-      <div class="panel">
-        <h3>Progreso por ejercicio</h3>
-        <div class="field grow" style="margin-bottom:14px;">
-          <label>Ejercicio</label>
-          <select id="progress-exercise"><option value="">Elegí un ejercicio</option></select>
-        </div>
-        <div id="progress-empty" class="empty">Elegí un ejercicio para ver su evolución de cargas.</div>
-        <div id="progress-content" style="display:none;">
-          <div class="chart-title">Peso máximo y 1RM estimado por sesión</div>
-          <canvas id="chart-progress-weight" height="140"></canvas>
-          <div class="chart-title" style="margin-top:22px;">Volumen total por sesión (reps × peso)</div>
-          <canvas id="chart-progress-volume" height="140"></canvas>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- DEPORTE -->
-  <section id="tab-deporte" class="tabsection" style="display:none;">
-    <div class="subtabs">
-      <button class="subtab active" data-deportetab="registrar">Registrar</button>
-      <button class="subtab" data-deportetab="carga">Carga semanal</button>
-    </div>
-
-    <div id="deporte-registrar" class="deportetabsection">
-      <div class="panel">
-        <h3 id="deporte-log-title">Deporte del día</h3>
-        <div id="deporte-log-list"></div>
-        <div id="deporte-day-total"></div>
-        <form id="deporte-form" style="margin-top:14px;">
-          <div class="form-row" style="margin-top:0;">
-            <div class="field grow">
-              <label>Deporte</label>
-              <input type="text" id="deporte-name" list="deporte-list" placeholder="Ej: pádel, fútbol, running">
-              <datalist id="deporte-list"></datalist>
-            </div>
-            <div class="field small">
-              <label>Duración (min)</label>
-              <input type="number" min="0" id="deporte-duration" placeholder="60">
-            </div>
-            <div class="field">
-              <label>Intensidad (RPE)</label>
-              <select id="deporte-rpe">
-                <option value="1">1 — muy liviano</option>
-                <option value="2">2</option>
-                <option value="3">3 — liviano</option>
-                <option value="4">4</option>
-                <option value="5">5 — moderado</option>
-                <option value="6">6</option>
-                <option value="7" selected>7 — intenso</option>
-                <option value="8">8</option>
-                <option value="9">9 — muy intenso</option>
-                <option value="10">10 — esfuerzo máximo</option>
-              </select>
-            </div>
-          </div>
-          <div class="field grow" style="margin-top:10px;">
-            <label>Nota (opcional)</label>
-            <input type="text" id="deporte-note" placeholder="Ej: ganamos 6-3, sentí bien las piernas">
-          </div>
-          <button type="submit" class="btn" style="margin-top:12px;">Guardar sesión</button>
-        </form>
-      </div>
-    </div>
-
-    <div id="deporte-carga" class="deportetabsection" style="display:none;">
-      <div class="panel">
-        <h3>Carga semanal (duración × intensidad)</h3>
-        <div id="carga-empty" class="empty">Registrá sesiones de deporte para ver tu carga semanal acá.</div>
-        <div id="carga-content" style="display:none;">
-          <canvas id="chart-carga" height="160"></canvas>
-          <div class="chart-title" style="margin-top:18px;">Esta semana por deporte</div>
-          <div id="carga-breakdown"></div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -606,8 +614,9 @@ let state = {
   gym: { exercises: DEFAULT_EXERCISES, logs: {}, currentRoutine: null, routineHistory: [], sportLogs: {}, whoop: null, pushSubscription: null }
 };
 let selectedDate = todayStr();
-let activeTab = 'dia';
+let activeTab = 'alimentacion';
 let activeGymTab = 'registrar';
+let activeActividadTab = 'gimnasio';
 let charts = {};
 let foodNameDebounceTimer = null;
 let userEditedFoodFields = false;
@@ -768,6 +777,7 @@ async function loadAll() {
   if (!state.gym.sportLogs) state.gym.sportLogs = {};
   if (state.gym.whoop === undefined) state.gym.whoop = null;
   if (state.gym.pushSubscription === undefined) state.gym.pushSubscription = null;
+  if (state.gym.whoopVitals === undefined) state.gym.whoopVitals = null;
   if (!state.gym.whoopImportedIds) state.gym.whoopImportedIds = [];
 }
 
@@ -924,13 +934,15 @@ function buildLocalRoutine(plan, library) {
 function computeDayTotals(dateStr) {
   const d = dayData(dateStr);
   const intake = d.foods.reduce((s, f) => s + Number(f.calories || 0), 0);
-  const burned = d.activities.reduce((s, a) => s + Number(a.calories || 0), 0);
-  return { intake, burned };
+  const deporteBurned = d.activities.filter(a => a.source === 'deporte').reduce((s, a) => s + Number(a.calories || 0), 0);
+  const actividadBurned = d.activities.filter(a => a.source !== 'deporte').reduce((s, a) => s + Number(a.calories || 0), 0);
+  const burned = actividadBurned + deporteBurned;
+  return { intake, burned, actividadBurned, deporteBurned };
 }
 function renderHero() {
   const { deficitGoal } = state.nutrition.settings;
   const tdee = tdeeFor(selectedDate);
-  const { intake, burned } = computeDayTotals(selectedDate);
+  const { intake, burned, actividadBurned, deporteBurned } = computeDayTotals(selectedDate);
   const targetIntake = tdee - deficitGoal;
   const balance = tdee + burned - intake;
   document.getElementById('hero-date').textContent = fmtFull(selectedDate);
@@ -941,9 +953,13 @@ function renderHero() {
     ? `Déficit de ${balance} kcal respecto a tu meta de mantenimiento`
     : `Superávit de ${Math.abs(balance)} kcal respecto a tu meta de mantenimiento`;
   document.getElementById('stat-intake').textContent = intake + ' kcal';
-  document.getElementById('stat-burned').textContent = burned + ' kcal';
+  document.getElementById('stat-burned').textContent = actividadBurned + ' kcal';
+  document.getElementById('stat-deporte').textContent = deporteBurned + ' kcal';
   document.getElementById('stat-target').textContent = targetIntake + ' kcal';
   document.getElementById('stat-tdee').textContent = tdee + ' kcal';
+  const whoopEl = document.getElementById('stat-whoop');
+  whoopEl.textContent = state.gym.whoop ? 'Conectado' : 'No conectado';
+  whoopEl.style.color = state.gym.whoop ? '#4FBE8B' : '';
   document.getElementById('date-input').value = selectedDate;
   document.getElementById('daytype-select').value = dayTypeFor(selectedDate);
 }
@@ -1265,7 +1281,7 @@ function renderGymLog() {
         <div style="margin-top:8px;"><button class="btn secondary" id="add-gym-as-activity">Agregar como actividad de hoy</button></div>
       </div>`;
     document.getElementById('add-gym-as-activity').onclick = () => {
-      addActivity(selectedDate, { name: 'Entrenamiento (' + entries.length + ' ejercicios)', calories: total, duration: null });
+      addActivity(selectedDate, { name: 'Entrenamiento (' + entries.length + ' ejercicios)', calories: total, duration: null, source: 'gimnasio' });
       renderAll();
     };
   } else {
@@ -1385,6 +1401,7 @@ function renderAll() {
   renderCarga();
   renderConfig();
   renderWhoopStatus();
+  renderWhoopVitalsStatus();
   renderPushStatus();
 }
 
@@ -1478,7 +1495,7 @@ async function whoopSync() {
       const dateStr = isoToLocalDateStr(r.start);
       const durationMin = Math.round((new Date(r.end) - new Date(r.start)) / 60000);
       const kcal = r.score.kilojoule != null ? Math.round(r.score.kilojoule / 4.184) : 0;
-      addActivity(dateStr, { name: 'Entrenamiento Whoop (tipo #' + r.sport_id + ')', calories: kcal, duration: durationMin });
+      addActivity(dateStr, { name: 'Entrenamiento Whoop (tipo #' + r.sport_id + ')', calories: kcal, duration: durationMin, source: 'whoop' });
       state.gym.whoopImportedIds.push(r.id);
       imported++;
     });
@@ -1575,7 +1592,53 @@ function renderWhoopStatus() {
   }
 }
 
-/* ====================== NUTRIA ====================== */
+function renderWhoopVitalsStatus() {
+  const statusBox = document.getElementById('whoop-vitals-status');
+  const refreshBtn = document.getElementById('whoop-vitals-refresh-btn');
+  const contentBox = document.getElementById('whoop-vitals-content');
+  if (!state.gym.whoop) {
+    statusBox.innerHTML = '<div class="entry-meta">Conectá Whoop en Configuración para ver esto.</div>';
+    refreshBtn.style.display = 'none';
+    contentBox.innerHTML = '';
+    return;
+  }
+  statusBox.innerHTML = '<div class="entry-meta">Conectado.</div>';
+  refreshBtn.style.display = 'inline-block';
+  const v = state.gym.whoopVitals;
+  if (v) {
+    contentBox.innerHTML = `
+      ${v.recoveryScore != null ? `<span class="mock-badge" style="display:inline-block; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px; margin-right:8px;">Recovery: ${v.recoveryScore}%</span>` : ''}
+      ${v.sleepHours != null ? `<span class="mock-badge" style="display:inline-block; background:var(--slate-soft); color:var(--slate); font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px;">Dormiste ${v.sleepHours}hs${v.sleepPerformance != null ? ' · ' + v.sleepPerformance + '% performance' : ''}</span>` : ''}
+      <div class="hint">Actualizado ${fmtLabel(v.fetchedAt.slice(0, 10))}.</div>`;
+  } else {
+    contentBox.innerHTML = '<div class="empty">Todavía no se trajeron datos — tocá "Actualizar".</div>';
+  }
+}
+async function whoopFetchVitals() {
+  const btn = document.getElementById('whoop-vitals-refresh-btn');
+  const errorBox = document.getElementById('whoop-vitals-error');
+  errorBox.classList.remove('show');
+  btn.disabled = true; btn.textContent = 'Actualizando…';
+  try {
+    const token = await whoopEnsureValidToken();
+    if (!token) throw new Error('no conectado');
+    const data = await callWhoopFunction({ action: 'vitals', accessToken: token });
+    state.gym.whoopVitals = {
+      recoveryScore: data.recovery && data.recovery.score ? Math.round(data.recovery.score.recovery_score) : null,
+      sleepHours: data.sleep && data.sleep.score && data.sleep.score.stage_summary
+        ? Math.round((data.sleep.score.stage_summary.total_in_bed_time_milli / 3600000) * 10) / 10 : null,
+      sleepPerformance: data.sleep && data.sleep.score && data.sleep.score.sleep_performance_percentage != null
+        ? Math.round(data.sleep.score.sleep_performance_percentage) : null,
+      fetchedAt: new Date().toISOString()
+    };
+    await persistGym();
+    renderWhoopVitalsStatus();
+  } catch (err) {
+    errorBox.textContent = 'No se pudo traer los datos de Whoop. Probá de nuevo en unos minutos.';
+    errorBox.classList.add('show');
+  }
+  btn.disabled = false; btn.textContent = 'Actualizar';
+}
 function nutriaContextFor(category) {
   if (category === 'alimentacion') {
     const chart = buildChartData();
@@ -1919,7 +1982,7 @@ function renderDeporteLog() {
         <div style="margin-top:8px;"><button class="btn secondary" id="add-deporte-as-activity">Agregar como actividad de hoy</button></div>
       </div>`;
     document.getElementById('add-deporte-as-activity').onclick = () => {
-      addActivity(selectedDate, { name: 'Deporte (' + entries.map(e => e.sport).join(', ') + ')', calories: total, duration: null });
+      addActivity(selectedDate, { name: 'Deporte (' + entries.map(e => e.sport).join(', ') + ')', calories: total, duration: null, source: 'deporte' });
       renderAll();
     };
   } else {
@@ -1985,23 +2048,34 @@ function wireEvents() {
       document.querySelectorAll('.tabsection').forEach(s => s.style.display = 'none');
       document.getElementById('tab-' + activeTab).style.display = 'block';
       if (activeTab === 'historial') { renderHistorial(); renderWeightChart(); renderBodyFatChart(); renderSummariesHistory(); }
-      if (activeTab === 'gimnasio') { renderGymLog(); renderRoutine(); renderProgress(); }
-      if (activeTab === 'deporte') { renderDeporteDatalist(); renderDeporteLog(); renderCarga(); }
+      if (activeTab === 'actividad') {
+        renderGymLog(); renderRoutine(); renderProgress();
+        renderDeporteDatalist(); renderDeporteLog(); renderCarga();
+        renderWhoopVitalsStatus();
+      }
     };
   });
-  document.querySelectorAll('#tab-gimnasio .subtab').forEach(btn => {
+  document.querySelectorAll('#actividad-outer-subtabs .subtab').forEach(btn => {
+    btn.onclick = () => {
+      activeActividadTab = btn.dataset.actividadtab;
+      document.querySelectorAll('#actividad-outer-subtabs .subtab').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.actividadtabsection').forEach(s => s.style.display = 'none');
+      document.getElementById('actividad-' + activeActividadTab).style.display = 'block';
+    };
+  });
+  document.querySelectorAll('#actividad-gimnasio .subtab').forEach(btn => {
     btn.onclick = () => {
       activeGymTab = btn.dataset.gymtab;
-      document.querySelectorAll('#tab-gimnasio .subtab').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('#actividad-gimnasio .subtab').forEach(b => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.gymtabsection').forEach(s => s.style.display = 'none');
       document.getElementById('gym-' + activeGymTab).style.display = 'block';
       if (activeGymTab === 'progreso') renderProgress();
     };
   });
-  document.querySelectorAll('#tab-deporte .subtab').forEach(btn => {
+  document.querySelectorAll('#actividad-deporte .subtab').forEach(btn => {
     btn.onclick = () => {
       const target = btn.dataset.deportetab;
-      document.querySelectorAll('#tab-deporte .subtab').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('#actividad-deporte .subtab').forEach(b => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.deportetabsection').forEach(s => s.style.display = 'none');
       document.getElementById('deporte-' + target).style.display = 'block';
       if (target === 'carga') renderCarga();
@@ -2053,7 +2127,8 @@ function wireEvents() {
     if (!name || cal === '') return;
     addActivity(selectedDate, {
       name, calories: Math.round(Number(cal)) || 0,
-      duration: document.getElementById('act-duration').value === '' ? null : Math.round(Number(document.getElementById('act-duration').value))
+      duration: document.getElementById('act-duration').value === '' ? null : Math.round(Number(document.getElementById('act-duration').value)),
+      source: 'manual'
     });
     userEditedActFields = false;
     lastEstimatedAct = '';
@@ -2215,6 +2290,7 @@ function wireEvents() {
 
   document.getElementById('whoop-connect-btn').onclick = whoopStartConnect;
   document.getElementById('whoop-sync-btn').onclick = whoopSync;
+  document.getElementById('whoop-vitals-refresh-btn').onclick = whoopFetchVitals;
   document.getElementById('whoop-disconnect-btn').onclick = () => {
     state.gym.whoop = null;
     persistGym();

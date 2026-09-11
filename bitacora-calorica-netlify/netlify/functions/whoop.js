@@ -87,6 +87,21 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(data) };
     }
 
+    if (payload.action === 'vitals') {
+      const authHeaders = { 'Authorization': 'Bearer ' + payload.accessToken };
+      const [recRes, sleepRes] = await Promise.all([
+        fetch(API_BASE + '/recovery?limit=1', { headers: authHeaders }),
+        fetch(API_BASE + '/activity/sleep?limit=1', { headers: authHeaders })
+      ]);
+      const [recParsed, sleepParsed] = await Promise.all([safeReadResponse(recRes), safeReadResponse(sleepRes)]);
+      if (!recRes.ok && !sleepRes.ok) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: whoopErrorMessage(recRes.status, recParsed.data, recParsed.raw, 'Whoop (vitals)') }) };
+      }
+      const recovery = recParsed.data && recParsed.data.records && recParsed.data.records[0];
+      const sleep = sleepParsed.data && sleepParsed.data.records && sleepParsed.data.records[0];
+      return { statusCode: 200, headers, body: JSON.stringify({ recovery: recovery || null, sleep: sleep || null }) };
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Acción desconocida' }) };
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Error interno de la función: ' + String(err && err.message || err) }) };
