@@ -43,7 +43,7 @@ exports.handler = async (event) => {
         { type: 'image', source: { type: 'base64', media_type: payload.mediaType || 'image/jpeg', data: payload.image } },
         {
           type: 'text',
-          text: 'Sos un nutricionista. Mirá esta foto de comida y estimá, en JSON puro (sin texto adicional, sin backticks, sin markdown), lo siguiente: {"name": "nombre breve del plato en español", "calories": numero_entero_estimado, "protein_g": numero, "carbs_g": numero, "fat_g": numero, "confidence": "alta, media o baja", "note": "una frase corta aclarando el supuesto de porción usado"}. Si hay varios alimentos en la foto, sumá el total estimado. Respondé SOLO el JSON, nada más.'
+          text: 'Sos un nutricionista. Mirá esta foto de comida y estimá, en JSON puro (sin texto adicional, sin backticks, sin markdown), lo siguiente: {"name": "nombre breve del plato en español", "calories": numero_entero_estimado, "protein_g": numero, "carbs_g": numero, "fat_g": numero, "confidence": "alta, media o baja", "note": "una frase corta aclarando el supuesto de porción usado", "comment": "un comentario nutricional breve y constructivo sobre esta comida puntual — si tiene mucha grasa, sodio o azúcar, sugerí un cambio concreto (ej: cambiar papas fritas por ensalada); si está bien balanceada, decilo también. Máximo 2 oraciones, tono cercano, nunca alarmista ni culpabilizador"}. Si hay varios alimentos en la foto, sumá el total estimado. Respondé SOLO el JSON, nada más.'
         }
       ]
     }];

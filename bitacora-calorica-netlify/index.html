@@ -160,6 +160,15 @@
   .routine-ex-suggestion { color: var(--gold); font-size: 11px; margin-top: 2px; font-weight: 700; }
   .video-link { color: var(--slate); font-size: 11px; font-weight: 700; display: inline-block; margin-top: 4px; }
   canvas { max-width: 100%; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(20,24,28,0.55); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px; }
+  .modal-card { background: var(--card); border-radius: var(--radius); padding: 22px; max-width: 420px; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.25); max-height: 80vh; overflow-y: auto; }
+  .modal-title { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 17px; margin-bottom: 12px; }
+  .modal-body { font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .modal-body .modal-stat { color: var(--ink-soft); font-size: 12px; margin-top: 10px; }
+  .summary-item { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .summary-item:last-child { border-bottom: none; }
+  .summary-date { font-weight: 700; font-size: 13px; }
+  .summary-text { font-size: 13px; color: var(--ink-soft); margin-top: 3px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -214,7 +223,8 @@
       <form id="food-form">
         <div class="form-row">
           <div class="field grow"><label>Alimento</label><input type="text" id="food-name" placeholder="Ej: milanesa con puré"></div>
-          <div class="field small"><label>Kcal</label><input type="number" min="0" id="food-cal" placeholder="0"></div>
+          <div class="field small"><label>Cantidad</label><input type="number" min="1" step="1" id="food-quantity" value="1"></div>
+          <div class="field small"><label>Kcal (x1)</label><input type="number" min="0" id="food-cal" placeholder="0"></div>
           <button type="submit" class="btn">Agregar</button>
         </div>
         <div class="form-row" id="food-macros" style="display:none;">
@@ -235,9 +245,11 @@
       <div class="suggestion" id="photo-suggestion">
         <div class="suggestion-title">Sugerencia de la foto</div>
         <div class="suggestion-macros" id="suggestion-meta"></div>
+        <div class="coach-note" id="suggestion-comment" style="display:none;"></div>
         <div class="form-row" style="margin-top:0;">
           <div class="field grow"><label>Alimento</label><input type="text" id="sugg-name"></div>
-          <div class="field small"><label>Kcal</label><input type="number" id="sugg-cal"></div>
+          <div class="field small"><label>Cantidad</label><input type="number" min="1" step="1" id="sugg-quantity" value="1"></div>
+          <div class="field small"><label>Kcal (x1)</label><input type="number" id="sugg-cal"></div>
           <div class="field small"><label>Prot. (g)</label><input type="number" id="sugg-protein"></div>
           <div class="field small"><label>Carb. (g)</label><input type="number" id="sugg-carbs"></div>
           <div class="field small"><label>Grasa (g)</label><input type="number" id="sugg-fat"></div>
@@ -326,6 +338,12 @@
       <div id="bodycomp-content" style="display:none;">
         <canvas id="chart-bodyfat" height="140"></canvas>
       </div>
+    </div>
+
+    <div class="panel">
+      <h3>Resúmenes diarios</h3>
+      <div id="summaries-empty" class="empty">Todavía no se generó ningún resumen diario.</div>
+      <div id="summaries-list"></div>
     </div>
   </section>
 
@@ -500,6 +518,14 @@
   </section>
 
   <div class="error-box" id="global-error"></div>
+</div>
+
+<div id="summary-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">Tu resumen de ayer</div>
+    <div id="summary-modal-body" class="modal-body"></div>
+    <button class="btn" id="summary-modal-close" style="margin-top:16px;">Cerrar</button>
+  </div>
 </div>
 
 <script>
@@ -710,6 +736,7 @@ async function loadAll() {
   if (!state.nutrition.days) state.nutrition.days = {};
   if (!state.nutrition.weights) state.nutrition.weights = {};
   if (!state.nutrition.bodyComp) state.nutrition.bodyComp = {};
+  if (!state.nutrition.dailySummaries) state.nutrition.dailySummaries = {};
   if (state.nutrition.settings.heightCm === undefined) state.nutrition.settings.heightCm = null;
 
   // Gimnasio
@@ -1045,6 +1072,41 @@ function renderHistorial() {
     ]
   }, { scales: { y: { grid: { color: '#E4E1D8' } }, x: { grid: { display: false } } } });
 }
+function checkUnseenSummary() {
+  const dates = Object.keys(state.nutrition.dailySummaries).sort();
+  for (const d of dates) {
+    const s = state.nutrition.dailySummaries[d];
+    if (!s.seen) {
+      showSummaryModal(d, s);
+      s.seen = true;
+      persistNutrition();
+      break; // solo mostramos uno por vez
+    }
+  }
+}
+function showSummaryModal(dateStr, summary) {
+  document.getElementById('summary-modal-body').innerHTML = `
+    <div>${escapeHtml(summary.text)}</div>
+    <div class="modal-stat">
+      ${fmtLabel(dateStr)} · Consumido ${summary.intake ?? '—'} kcal · Quemado ${summary.burned ?? '—'} kcal
+      ${summary.whoopSummary ? '<br>' + escapeHtml(summary.whoopSummary) : ''}
+    </div>`;
+  document.getElementById('summary-modal-overlay').style.display = 'flex';
+}
+function renderSummariesHistory() {
+  const dates = Object.keys(state.nutrition.dailySummaries).sort().reverse().slice(0, 30);
+  const empty = document.getElementById('summaries-empty');
+  const list = document.getElementById('summaries-list');
+  if (!dates.length) { empty.style.display = 'block'; list.innerHTML = ''; return; }
+  empty.style.display = 'none';
+  list.innerHTML = dates.map(d => {
+    const s = state.nutrition.dailySummaries[d];
+    return `<div class="summary-item">
+      <div class="summary-date">${fmtLabel(d)}</div>
+      <div class="summary-text">${escapeHtml(s.text)}</div>
+    </div>`;
+  }).join('');
+}
 function renderBodyFatChart() {
   const entries = state.nutrition.bodyComp;
   const dates = Object.keys(entries).sort();
@@ -1306,6 +1368,7 @@ function renderAll() {
   renderWeightToday();
   renderBodyFatChart();
   renderBodyCompToday();
+  renderSummariesHistory();
   renderExerciseDatalist();
   renderGymLog();
   renderRoutine();
@@ -1530,12 +1593,16 @@ async function analyzePhoto(file) {
     });
     const parsed = await callAiFunction({ action: 'foto', image: base64, mediaType: file.type || 'image/jpeg' });
     document.getElementById('sugg-name').value = parsed.name || 'Comida sin nombre';
+    document.getElementById('sugg-quantity').value = 1;
     document.getElementById('sugg-cal').value = Math.round(Number(parsed.calories)) || 0;
     document.getElementById('sugg-protein').value = parsed.protein_g != null ? Math.round(Number(parsed.protein_g)) : '';
     document.getElementById('sugg-carbs').value = parsed.carbs_g != null ? Math.round(Number(parsed.carbs_g)) : '';
     document.getElementById('sugg-fat').value = parsed.fat_g != null ? Math.round(Number(parsed.fat_g)) : '';
     document.getElementById('suggestion-meta').textContent =
       'Confianza: ' + (parsed.confidence || 'sin dato') + (parsed.note ? ' · ' + parsed.note : '');
+    const commentBox = document.getElementById('suggestion-comment');
+    if (parsed.comment) { commentBox.textContent = parsed.comment; commentBox.style.display = 'block'; }
+    else { commentBox.style.display = 'none'; }
     suggestionBox.classList.add('show');
   } catch (err) {
     errorBox.textContent = 'No se pudo analizar la foto. Podés cargarla a mano.';
@@ -1816,7 +1883,7 @@ function wireEvents() {
       document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.tabsection').forEach(s => s.style.display = 'none');
       document.getElementById('tab-' + activeTab).style.display = 'block';
-      if (activeTab === 'historial') { renderHistorial(); renderWeightChart(); renderBodyFatChart(); }
+      if (activeTab === 'historial') { renderHistorial(); renderWeightChart(); renderBodyFatChart(); renderSummariesHistory(); }
       if (activeTab === 'gimnasio') { renderGymLog(); renderRoutine(); renderProgress(); }
       if (activeTab === 'deporte') { renderDeporteDatalist(); renderDeporteLog(); renderCarga(); }
     };
@@ -1853,17 +1920,24 @@ function wireEvents() {
     const name = document.getElementById('food-name').value.trim();
     const cal = document.getElementById('food-cal').value;
     if (!name || cal === '') return;
+    const qty = Math.max(1, Math.round(Number(document.getElementById('food-quantity').value)) || 1);
+    const protein = document.getElementById('food-protein').value;
+    const carbs = document.getElementById('food-carbs').value;
+    const fat = document.getElementById('food-fat').value;
     addFood(selectedDate, {
-      name, calories: Math.round(Number(cal)) || 0,
-      protein: document.getElementById('food-protein').value === '' ? null : Math.round(Number(document.getElementById('food-protein').value)),
-      carbs: document.getElementById('food-carbs').value === '' ? null : Math.round(Number(document.getElementById('food-carbs').value)),
-      fat: document.getElementById('food-fat').value === '' ? null : Math.round(Number(document.getElementById('food-fat').value)),
+      name: qty > 1 ? name + ' ×' + qty : name,
+      calories: Math.round((Number(cal) || 0) * qty),
+      protein: protein === '' ? null : Math.round(Number(protein) * qty),
+      carbs: carbs === '' ? null : Math.round(Number(carbs) * qty),
+      fat: fat === '' ? null : Math.round(Number(fat) * qty),
+      quantity: qty,
       source: 'manual'
     });
     userEditedFoodFields = false;
     lastEstimatedFoodName = '';
     document.getElementById('food-cal-hint').textContent = '';
     e.target.reset();
+    document.getElementById('food-quantity').value = 1;
     document.getElementById('food-macros').style.display = 'none';
     document.getElementById('toggle-macros').style.display = 'inline';
     renderAll();
@@ -1962,12 +2036,18 @@ function wireEvents() {
   document.getElementById('sugg-discard').onclick = () => document.getElementById('photo-suggestion').classList.remove('show');
   document.getElementById('suggest-meals-btn').onclick = suggestMeals;
   document.getElementById('sugg-confirm').onclick = () => {
+    const qty = Math.max(1, Math.round(Number(document.getElementById('sugg-quantity').value)) || 1);
+    const name = document.getElementById('sugg-name').value;
+    const protein = document.getElementById('sugg-protein').value;
+    const carbs = document.getElementById('sugg-carbs').value;
+    const fat = document.getElementById('sugg-fat').value;
     addFood(selectedDate, {
-      name: document.getElementById('sugg-name').value,
-      calories: Math.round(Number(document.getElementById('sugg-cal').value)) || 0,
-      protein: document.getElementById('sugg-protein').value === '' ? null : Math.round(Number(document.getElementById('sugg-protein').value)),
-      carbs: document.getElementById('sugg-carbs').value === '' ? null : Math.round(Number(document.getElementById('sugg-carbs').value)),
-      fat: document.getElementById('sugg-fat').value === '' ? null : Math.round(Number(document.getElementById('sugg-fat').value)),
+      name: qty > 1 ? name + ' ×' + qty : name,
+      calories: Math.round((Number(document.getElementById('sugg-cal').value) || 0) * qty),
+      protein: protein === '' ? null : Math.round(Number(protein) * qty),
+      carbs: carbs === '' ? null : Math.round(Number(carbs) * qty),
+      fat: fat === '' ? null : Math.round(Number(fat) * qty),
+      quantity: qty,
       source: 'photo'
     });
     document.getElementById('photo-suggestion').classList.remove('show');
@@ -2039,6 +2119,9 @@ function wireEvents() {
   };
   document.getElementById('push-enable-btn').onclick = enablePushNotifications;
   document.getElementById('push-disable-btn').onclick = disablePushNotifications;
+  document.getElementById('summary-modal-close').onclick = () => {
+    document.getElementById('summary-modal-overlay').style.display = 'none';
+  };
 }
 function addSetRow() {
   const container = document.getElementById('sets-container');
@@ -2064,6 +2147,7 @@ async function init() {
   await whoopHandleRedirectIfPresent();
   setSaving('');
   renderAll();
+  checkUnseenSummary();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }

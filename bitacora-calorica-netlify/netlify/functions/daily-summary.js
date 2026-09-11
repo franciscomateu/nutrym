@@ -162,6 +162,16 @@ exports.handler = async () => {
         : (balance >= 0 ? `Cerraste con déficit de ${balance} kcal.` : `Cerraste con superávit de ${Math.abs(balance)} kcal.`);
     }
 
+    if (!nutrition.dailySummaries) nutrition.dailySummaries = {};
+    nutrition.dailySummaries[today] = {
+      text: summaryText,
+      intake, burned, tdee, balance,
+      whoopSummary: whoopSummary || null,
+      generatedAt: new Date().toISOString(),
+      seen: false
+    };
+    await jsonbinPut(NUTRITION_BIN_ID, nutrition);
+
     if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
       webpush.setVapidDetails(VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
       try {
