@@ -66,11 +66,14 @@ exports.handler = async (event) => {
       + 'Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"note": "frase corta de contexto", "options": [{"name": "nombre del plato", "calories": numero_entero, "protein_g": numero, "reason": "una frase corta de por qué la sugerís"}]}. Devolvé exactamente 3 opciones. Respondé SOLO el JSON.';
     messages = [{ role: 'user', content: prompt }];
   } else if (payload.action === 'rutina') {
-    const prompt = 'Sos un entrenador de fuerza. Armá una rutina semanal de gimnasio en JSON puro (sin texto adicional, sin backticks, sin markdown) con esta forma: '
-      + '{"splitName": "nombre del tipo de split en español", "days": [{"day": "Lunes", "focus": "grupos musculares del día", "exercises": [{"name": "ejercicio", "sets": numero, "reps": "rango de reps ej 8-10", "note": "tip breve opcional"}]}], "coachNote": "2-3 frases con foco de la semana"}. '
-      + 'Reglas: 3 a 5 días de entrenamiento distribuidos en la semana (Lunes a Domingo), 4 a 6 ejercicios por día, variedad realista de gimnasio. '
+    const planText = (payload.plan || []).map(p => p.day + ': ' + p.focus).join(' | ') || 'sin plan (usar full body genérico)';
+    const prompt = 'Sos un entrenador de fuerza. El usuario ya decidió su propio split semanal — vos SOLO tenés que completar los ejercicios de cada día, respetando EXACTAMENTE ese plan (mismos días, mismo foco muscular por día, mismo orden). '
+      + 'Plan del usuario: ' + planText + '. '
+      + 'Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown) con esta forma: '
+      + '{"splitName": "nombre corto que resuma el split del usuario", "days": [{"day": "Día 1", "focus": "el mismo foco que te pasé para ese día", "exercises": [{"name": "ejercicio", "sets": numero, "reps": "rango de reps ej 8-10", "note": "tip breve opcional"}]}], "coachNote": "2-3 frases con foco de la semana"}. '
+      + 'Reglas: 4 a 6 ejercicios por día, TODOS coherentes con el foco muscular de ESE día específico — no mezcles grupos musculares que no correspondan a ese día (ej: si el foco es "Piernas", nada de pecho o espalda ese día). Variedad realista de gimnasio. '
       + 'Los últimos entrenamientos registrados fueron: ' + (payload.recentSummary || 'sin datos') + '. '
-      + 'Los splits de semanas anteriores fueron: ' + (payload.previousSplits || 'ninguna') + '; elegí un enfoque distinto a esos para dar variedad. '
+      + 'Los splits de semanas anteriores fueron: ' + (payload.previousSplits || 'ninguna') + '; para dar variedad, evitá repetir los mismos ejercicios exactos de esas semanas cuando el foco lo permita. '
       + 'La persona está en un objetivo calórico de ' + (payload.goalPhrase || 'mantenimiento') + ', considerá eso en el coachNote (recuperación, intensidad). '
       + 'Respondé SOLO el JSON.';
     messages = [{ role: 'user', content: prompt }];

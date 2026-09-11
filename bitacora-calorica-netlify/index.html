@@ -389,9 +389,13 @@
     <div id="gym-rutina" class="gymtabsection" style="display:none;">
       <div class="panel">
         <div class="routine-header">
-          <h3 style="margin:0;">Rutina de la semana</h3>
-          <button class="btn slate" id="generate-routine-btn">Generar rutina de esta semana</button>
+          <h3 style="margin:0;">Armar rutina de la semana</h3>
         </div>
+        <div class="form-row" style="margin-top:0;">
+          <div class="field small"><label>Días por semana</label><input type="number" id="routine-days-count" min="1" max="7" value="4"></div>
+        </div>
+        <div id="routine-day-pickers" style="margin-top:14px;"></div>
+        <button class="btn slate" id="generate-routine-btn" style="margin-top:14px;">Generar rutina con esta configuración</button>
         <div class="error-box" id="routine-error"></div>
         <div id="routine-content"></div>
       </div>
@@ -564,32 +568,16 @@ const DEFAULT_EXERCISES = [
   { id: 'plancha', name: 'Plancha', group: 'Core' },
   { id: 'abdominales', name: 'Abdominales en polea', group: 'Core' }
 ];
-const ROUTINE_TEMPLATES = [
-  { name: 'Full body (3 días)', days: [
-    { day: 'Lunes', focus: 'Full body A', groups: ['Piernas', 'Pecho', 'Espalda'] },
-    { day: 'Miércoles', focus: 'Full body B', groups: ['Piernas', 'Hombros', 'Brazos'] },
-    { day: 'Viernes', focus: 'Full body C', groups: ['Espalda', 'Pecho', 'Core'] }
-  ]},
-  { name: 'Empuje / Tracción / Pierna', days: [
-    { day: 'Lunes', focus: 'Empuje (pecho, hombro, tríceps)', groups: ['Pecho', 'Hombros', 'Brazos'] },
-    { day: 'Martes', focus: 'Tracción (espalda, bíceps)', groups: ['Espalda', 'Brazos'] },
-    { day: 'Miércoles', focus: 'Pierna', groups: ['Piernas'] },
-    { day: 'Viernes', focus: 'Empuje 2', groups: ['Pecho', 'Hombros'] },
-    { day: 'Sábado', focus: 'Tracción 2', groups: ['Espalda', 'Core'] }
-  ]},
-  { name: 'Torso / Pierna', days: [
-    { day: 'Lunes', focus: 'Torso A', groups: ['Pecho', 'Espalda'] },
-    { day: 'Martes', focus: 'Pierna A', groups: ['Piernas'] },
-    { day: 'Jueves', focus: 'Torso B', groups: ['Hombros', 'Brazos'] },
-    { day: 'Viernes', focus: 'Pierna B', groups: ['Piernas', 'Core'] }
-  ]},
-  { name: 'Tren superior / Tren inferior', days: [
-    { day: 'Lunes', focus: 'Tren superior', groups: ['Pecho', 'Espalda', 'Hombros'] },
-    { day: 'Martes', focus: 'Tren inferior', groups: ['Piernas'] },
-    { day: 'Jueves', focus: 'Tren superior 2', groups: ['Brazos', 'Hombros'] },
-    { day: 'Viernes', focus: 'Tren inferior 2', groups: ['Piernas', 'Core'] }
-  ]}
+const ROUTINE_COMBOS = [
+  { id: 'pecho-triceps', label: 'Pecho + Tríceps', groups: ['Pecho', 'Pecho', 'Brazos'] },
+  { id: 'espalda-biceps', label: 'Espalda + Bíceps', groups: ['Espalda', 'Espalda', 'Brazos'] },
+  { id: 'piernas', label: 'Piernas', groups: ['Piernas', 'Piernas', 'Piernas', 'Core'] },
+  { id: 'hombros-core', label: 'Hombros + Core', groups: ['Hombros', 'Hombros', 'Core'] },
+  { id: 'brazos', label: 'Brazos', groups: ['Brazos', 'Brazos', 'Brazos'] },
+  { id: 'full-body', label: 'Full body', groups: ['Piernas', 'Pecho', 'Espalda', 'Hombros'] }
 ];
+const ROUTINE_DEFAULT_SEQUENCE = ['pecho-triceps', 'espalda-biceps', 'piernas', 'hombros-core', 'brazos', 'full-body', 'piernas'];
+function comboById(id) { return ROUTINE_COMBOS.find(c => c.id === id) || ROUTINE_COMBOS[0]; }
 
 /* ====================== ESTADO ====================== */
 let state = {
@@ -903,12 +891,10 @@ function pickExercisesForGroups(groups, library) {
     return { name: pick.name, sets: 4, reps: '8-10', note: '' };
   }).filter(Boolean);
 }
-function buildLocalRoutine(prevSplitName, library) {
-  const idx = ROUTINE_TEMPLATES.findIndex(t => t.name === prevSplitName);
-  const tpl = ROUTINE_TEMPLATES[(idx + 1) % ROUTINE_TEMPLATES.length];
+function buildLocalRoutine(plan, library) {
   return {
-    splitName: tpl.name,
-    days: tpl.days.map(d => ({ day: d.day, focus: d.focus, exercises: pickExercisesForGroups(d.groups, library) })),
+    splitName: plan.map(p => p.focus).join(' / '),
+    days: plan.map(p => ({ day: p.day, focus: p.focus, exercises: pickExercisesForGroups(comboById(p.comboId).groups, library) })),
     coachNote: 'Rutina generada localmente porque no se pudo contactar a la IA. Ajustá los pesos según cómo te sientas y priorizá la técnica.'
   };
 }
@@ -1721,12 +1707,38 @@ async function estimateActivityCalories(name) {
   }
 }
 
+function renderRoutineDayPickers() {
+  const count = Math.min(7, Math.max(1, Math.round(Number(document.getElementById('routine-days-count').value)) || 1));
+  const container = document.getElementById('routine-day-pickers');
+  const existing = Array.from(container.querySelectorAll('select')).map(s => s.value);
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const defaultId = existing[i] || ROUTINE_DEFAULT_SEQUENCE[i % ROUTINE_DEFAULT_SEQUENCE.length];
+    const row = document.createElement('div');
+    row.className = 'form-row';
+    row.style.marginTop = i === 0 ? '0' : '8px';
+    row.innerHTML = `<div class="field grow"><label>Día ${i + 1}</label>
+      <select class="routine-day-select">
+        ${ROUTINE_COMBOS.map(c => `<option value="${c.id}" ${c.id === defaultId ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}
+      </select></div>`;
+    container.appendChild(row);
+  }
+}
+function getRoutinePlan() {
+  const selects = document.querySelectorAll('#routine-day-pickers .routine-day-select');
+  return Array.from(selects).map((sel, i) => ({
+    day: 'Día ' + (i + 1),
+    comboId: sel.value,
+    focus: comboById(sel.value).label
+  }));
+}
 async function generateRoutine() {
   const btn = document.getElementById('generate-routine-btn');
   const errorBox = document.getElementById('routine-error');
   errorBox.classList.remove('show');
   btn.disabled = true; btn.textContent = 'Generando…';
 
+  const plan = getRoutinePlan();
   const recentDates = Object.keys(state.gym.logs).sort().reverse().slice(0, 21);
   const recentSummary = recentDates.map(d => `${d}: ${state.gym.logs[d].map(en => en.exerciseName).join(', ')}`).join(' | ') || 'sin entrenamientos registrados todavía';
   const previousSplits = state.gym.routineHistory.slice(-3).map(r => r.splitName)
@@ -1735,16 +1747,16 @@ async function generateRoutine() {
   const goalPhrase = deficitGoal >= 0 ? `déficit de ${deficitGoal} kcal/día` : `superávit de ${Math.abs(deficitGoal)} kcal/día`;
 
   try {
-    const parsed = await callAiFunction({ action: 'rutina', recentSummary, previousSplits, goalPhrase });
+    const parsed = await callAiFunction({ action: 'rutina', plan, recentSummary, previousSplits, goalPhrase });
     if (!parsed.days || !parsed.days.length) throw new Error('formato inválido');
-    applyNewRoutine({ splitName: parsed.splitName || 'Rutina personalizada', days: parsed.days, coachNote: parsed.coachNote || '' });
+    applyNewRoutine({ splitName: parsed.splitName || plan.map(p => p.focus).join(' / '), days: parsed.days, coachNote: parsed.coachNote || '' });
   } catch (err) {
-    const local = buildLocalRoutine(state.gym.currentRoutine ? state.gym.currentRoutine.splitName : null, state.gym.exercises);
+    const local = buildLocalRoutine(plan, state.gym.exercises);
     applyNewRoutine(local);
-    errorBox.textContent = 'No se pudo generar con IA, armé una rutina alternativa. Podés reintentar en unos minutos.';
+    errorBox.textContent = 'No se pudo generar con IA, armé una rutina alternativa a partir de tu selección. Podés reintentar en unos minutos.';
     errorBox.classList.add('show');
   }
-  btn.disabled = false; btn.textContent = 'Generar nueva rutina';
+  btn.disabled = false; btn.textContent = 'Generar rutina con esta configuración';
 }
 function applyNewRoutine(routine) {
   if (state.gym.currentRoutine) state.gym.routineHistory = [...state.gym.routineHistory.slice(-3), state.gym.currentRoutine];
@@ -2084,6 +2096,8 @@ function wireEvents() {
   };
 
   document.getElementById('generate-routine-btn').onclick = generateRoutine;
+  document.getElementById('routine-days-count').addEventListener('input', renderRoutineDayPickers);
+  renderRoutineDayPickers();
   document.getElementById('progress-exercise').onchange = renderProgress;
 
   document.getElementById('cfg-tdee-sed').oninput = updateConfigHint;
