@@ -108,6 +108,32 @@ exports.handler = async () => {
     const balance = tdee + burned - intake;
     const foodsCount = (dayData.foods || []).length;
 
+    // Detección de patrones para que NutrIA sea proactiva, no solo reactiva
+    let patternNote = '';
+    const past7 = [];
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(new Date(today + 'T00:00:00Z').getTime() - i * 86400000).toISOString().slice(0, 10);
+      const dd = nutrition.days && nutrition.days[d];
+      if (dd && dd.foods && dd.foods.length) {
+        const in_ = dd.foods.reduce((s, f) => s + Number(f.calories || 0), 0);
+        const out_ = (dd.activities || []).reduce((s, a) => s + Number(a.calories || 0), 0);
+        past7.push(tdeeForDay(nutrition, d) + out_ - in_);
+      }
+    }
+    const consecutiveSurplus = (() => {
+      let count = 0;
+      for (const b of past7) { if (b < 0) count++; else break; }
+      return count;
+    })();
+    if (consecutiveSurplus >= 3) patternNote += `Lleva ${consecutiveSurplus} días seguidos en superávit (contando hoy si corresponde). `;
+    const wdates = Object.keys(nutrition.weights || {}).sort();
+    if (wdates.length) {
+      const daysSinceWeight = Math.round((new Date(today) - new Date(wdates[wdates.length - 1])) / 86400000);
+      if (daysSinceWeight >= 14) patternNote += `No registra su peso hace ${daysSinceWeight} días. `;
+    } else {
+      patternNote += 'Nunca cargó su peso. ';
+    }
+
     let whoopSummary = '';
     let gymChanged = false;
     if (gym.whoop) {
@@ -138,7 +164,8 @@ exports.handler = async () => {
         + 'Datos de hoy: consumió ' + intake + ' kcal (' + foodsCount + ' comidas cargadas), su meta de mantenimiento era ' + tdee + ' kcal, quemó ' + burned + ' kcal en actividad. '
         + 'Balance del día: ' + (balance >= 0 ? 'déficit de ' + balance + ' kcal' : 'superávit de ' + Math.abs(balance) + ' kcal') + '. '
         + (whoopSummary ? 'Datos de su Whoop: ' + whoopSummary : 'No tiene datos de Whoop hoy.') + ' '
-        + 'Escribí un mensaje de notificación push MUY breve (máximo 2 oraciones cortas, sin saludo, directo al grano) resumiendo cómo le fue hoy y una recomendación concreta para mañana. '
+        + (patternNote ? 'Patrones detectados en sus datos: ' + patternNote + 'Si alguno de estos patrones es relevante, mencionalo con tacto (sin regañar, como un entrenador que te conoce). ' : '')
+        + 'Escribí un mensaje de notificación push breve (máximo 3 oraciones cortas, sin saludo, directo al grano) resumiendo cómo le fue hoy, mencionando el patrón detectado si hay uno relevante, y una recomendación concreta para mañana. '
         + 'Si no cargó ninguna comida hoy, decíselo de forma neutral, sin regañar. Respondé SOLO el texto del mensaje, sin comillas, sin JSON.';
 
       const aiRes = await fetch('https://api.anthropic.com/v1/messages', {

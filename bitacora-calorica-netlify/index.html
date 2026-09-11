@@ -199,6 +199,7 @@
     </div>
     <div class="hero-number" id="hero-number"></div>
     <div class="hero-sub" id="hero-sub"></div>
+    <div class="hero-sub" id="streak-badge" style="color:#F0C060; font-weight:700; margin-top:4px;"></div>
     <div class="stats">
       <div><div class="stat-label">Comida</div><div class="stat-value" id="stat-intake"></div></div>
       <div><div class="stat-label">Actividad</div><div class="stat-value" id="stat-burned"></div></div>
@@ -241,8 +242,10 @@
       <div class="photo-row">
         <input type="file" accept="image/*" capture="environment" style="display:none;" id="photo-input">
         <button type="button" class="btn secondary" id="photo-btn">Cargar por foto</button>
+        <button type="button" class="btn secondary" id="barcode-btn">Escanear código de barras</button>
         <span class="hint" style="margin-top:0;">La IA estima calorías y macros a partir de la imagen; siempre podés editar antes de guardar.</span>
       </div>
+      <div class="error-box" id="barcode-error"></div>
       <div class="error-box" id="photo-error"></div>
       <div class="suggestion" id="photo-suggestion">
         <div class="suggestion-title">Sugerencia de la foto</div>
@@ -441,11 +444,13 @@
       <div id="historial-empty" class="empty">Cargá algunos días para ver el histórico acá.</div>
       <div id="historial-content" style="display:none;">
         <div class="avg-badge" id="avg-badge"></div>
+        <div class="hint" id="week-comparison-text" style="margin-top:-8px; margin-bottom:14px;"></div>
         <div class="chart-title">Balance diario (verde = déficit, ámbar = superávit)</div>
         <canvas id="chart-balance" height="140"></canvas>
         <div class="chart-title" style="margin-top:22px;">Ingesta diaria vs. meta</div>
         <canvas id="chart-intake" height="140"></canvas>
       </div>
+      <div id="tdee-suggestion" style="margin-top:16px;"></div>
     </div>
 
     <div class="panel">
@@ -561,6 +566,30 @@
   </div>
 </div>
 
+<div id="barcode-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">Escaneá el código de barras</div>
+    <video id="barcode-video" style="width:100%; border-radius:10px; background:#000;" playsinline></video>
+    <div class="hint">Apuntá al código de barras del producto — se detecta solo.</div>
+    <button class="btn secondary" id="barcode-modal-close" style="margin-top:12px;">Cancelar</button>
+  </div>
+</div>
+
+<div id="barcode-result-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">Producto encontrado</div>
+    <div id="barcode-result-body" class="modal-body"></div>
+    <div class="form-row" style="margin-top:10px;">
+      <div class="field small"><label>Gramos consumidos</label><input type="number" min="1" id="barcode-grams" value="100"></div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button class="btn" id="barcode-confirm">Agregar</button>
+      <button class="btn secondary" id="barcode-result-close">Descartar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 /* ====================== CONFIG ====================== */
 const JSONBIN_MASTER_KEY = '$2a$10$k.R5Udtn8mYhhnrwn9mPcOpEg/eo937TGhFk48UdrUQx9BRxzfh0W';
@@ -962,6 +991,17 @@ function renderHero() {
   whoopEl.style.color = state.gym.whoop ? '#4FBE8B' : '';
   document.getElementById('date-input').value = selectedDate;
   document.getElementById('daytype-select').value = dayTypeFor(selectedDate);
+  const streak = computeStreak();
+  const streakEl = document.getElementById('streak-badge');
+  streakEl.textContent = streak >= 2 ? `Racha: ${streak} días seguidos cargando comida` : '';
+}
+function computeStreak() {
+  let d = todayStr();
+  const hasFood = (dt) => state.nutrition.days[dt] && state.nutrition.days[dt].foods && state.nutrition.days[dt].foods.length > 0;
+  if (!hasFood(d)) d = addDaysStr(d, -1);
+  let streak = 0;
+  while (hasFood(d)) { streak++; d = addDaysStr(d, -1); }
+  return streak;
 }
 
 /* ====================== RENDER: DÍA ====================== */
@@ -1067,7 +1107,29 @@ function buildChartData() {
     return { date: d, label: fmtLabel(d), intake, burned, balance, target };
   }).slice(-30);
 }
+function computeSuggestedTDEE() {
+  const wdates = Object.keys(state.nutrition.weights).sort();
+  if (wdates.length < 2) return null;
+  const first = wdates[0], last = wdates[wdates.length - 1];
+  const daysBetween = Math.round((new Date(last) - new Date(first)) / 86400000);
+  if (daysBetween < 10) return null;
+  const weightChange = state.nutrition.weights[last] - state.nutrition.weights[first];
+  const chart = buildChartData().filter(c => c.date >= first && c.date <= last);
+  if (chart.length < 5) return null;
+  const avgIntake = Math.round(chart.reduce((s, c) => s + c.intake, 0) / chart.length);
+  const suggested = Math.round(avgIntake + (weightChange * 7700 / daysBetween));
+  return { suggested, avgIntake, weightChange: Math.round(weightChange * 10) / 10, days: daysBetween, trackedDays: chart.length };
+}
+function renderTdeeSuggestion() {
+  const box = document.getElementById('tdee-suggestion');
+  const result = computeSuggestedTDEE();
+  if (!result) { box.innerHTML = ''; return; }
+  const current = state.nutrition.settings.tdeeSedentario;
+  const diff = result.suggested - current;
+  box.innerHTML = `<div class="coach-note">Según tu peso (${result.weightChange >= 0 ? '+' : ''}${result.weightChange}kg en ${result.days} días) y tu consumo real promedio (${result.avgIntake} kcal en ${result.trackedDays} días trackeados), tu TDEE real ronda los <strong>${result.suggested} kcal</strong> — hoy tenés cargado ${current} kcal como Sedentario (${diff >= 0 ? '+' : ''}${diff} kcal de diferencia). Si la diferencia es grande y se sostiene en el tiempo, valdría la pena ajustarlo en Configuración.</div>`;
+}
 function renderHistorial() {
+  renderTdeeSuggestion();
   const data = buildChartData();
   const empty = document.getElementById('historial-empty');
   const content = document.getElementById('historial-content');
@@ -1076,6 +1138,24 @@ function renderHistorial() {
   const avg = Math.round(data.reduce((s, c) => s + c.balance, 0) / data.length);
   document.getElementById('avg-badge').textContent =
     `Promedio últimos ${data.length} días: ${avg >= 0 ? `déficit de ${avg}` : `superávit de ${Math.abs(avg)}`} kcal/día`;
+
+  const weekCompEl = document.getElementById('week-comparison-text');
+  if (data.length >= 10) {
+    const lastWeek = data.slice(-7);
+    const prevWeek = data.slice(-14, -7);
+    const avgOf = arr => Math.round(arr.reduce((s, c) => s + c.balance, 0) / arr.length);
+    const curAvg = avgOf(lastWeek);
+    if (prevWeek.length >= 3) {
+      const prevAvg = avgOf(prevWeek);
+      const diff = curAvg - prevAvg;
+      const diffTxt = diff === 0 ? 'igual que' : (diff > 0 ? `${diff} kcal más de déficit que` : `${Math.abs(diff)} kcal menos de déficit que`);
+      weekCompEl.textContent = `Esta semana: ${curAvg >= 0 ? 'déficit' : 'superávit'} de ${Math.abs(curAvg)} kcal/día promedio — ${diffTxt} la semana anterior.`;
+    } else {
+      weekCompEl.textContent = `Esta semana: ${curAvg >= 0 ? 'déficit' : 'superávit'} de ${Math.abs(curAvg)} kcal/día promedio.`;
+    }
+  } else {
+    weekCompEl.textContent = '';
+  }
 
   drawChart('chart-balance', 'bar', {
     labels: data.map(d => d.label),
@@ -1249,6 +1329,17 @@ function gymDayTotalCalories() {
   if (!withCal.length) return null;
   return withCal.reduce((s, en) => s + en.caloriesBurned, 0);
 }
+function isNewPR(exerciseName, weight, excludeDate) {
+  let maxWeight = 0;
+  Object.keys(state.gym.logs).forEach(d => {
+    if (d === excludeDate) return;
+    state.gym.logs[d].forEach(en => {
+      if (en.exerciseName.toLowerCase() !== exerciseName.toLowerCase()) return;
+      en.sets.forEach(s => { if (s.weight > maxWeight) maxWeight = s.weight; });
+    });
+  });
+  return maxWeight > 0 && weight > maxWeight;
+}
 function renderGymLog() {
   document.getElementById('gym-log-title').textContent = 'Entrenamiento del ' + fmtLabel(selectedDate);
   const entries = state.gym.logs[selectedDate] || [];
@@ -1258,10 +1349,13 @@ function renderGymLog() {
     document.getElementById('gym-day-total').innerHTML = '';
     return;
   }
-  list.innerHTML = entries.map(en => `
+  list.innerHTML = entries.map(en => {
+    const bestWeight = Math.max(...en.sets.map(s => s.weight));
+    const pr = isNewPR(en.exerciseName, bestWeight, selectedDate);
+    return `
     <div class="entry" style="align-items:flex-start;">
       <div>
-        <div class="entry-name">${escapeHtml(en.exerciseName)} <span class="entry-meta">(${escapeHtml(en.group)})</span></div>
+        <div class="entry-name">${escapeHtml(en.exerciseName)} <span class="entry-meta">(${escapeHtml(en.group)})</span>${pr ? ' <span style="color:var(--gold); font-weight:800; font-size:12px;">¡PR!</span>' : ''}</div>
         <div class="entry-meta">${en.sets.map(s => `${s.reps}x${s.weight}kg`).join(' · ')}</div>
         ${en.note ? `<div class="entry-meta">${escapeHtml(en.note)}</div>` : ''}
         <div class="entry-meta">
@@ -1270,7 +1364,8 @@ function renderGymLog() {
         </div>
       </div>
       <button class="del" data-remove-gym="${en.id}">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const total = gymDayTotalCalories();
   const totalBox = document.getElementById('gym-day-total');
@@ -1714,6 +1809,86 @@ async function callAiFunction(payload) {
   });
   if (!res.ok) throw new Error('función IA: ' + res.status);
   return res.json();
+}
+
+let barcodeReader = null;
+let barcodeProduct = null;
+function openBarcodeScanner() {
+  document.getElementById('barcode-error').classList.remove('show');
+  document.getElementById('barcode-modal-overlay').style.display = 'flex';
+  try {
+    barcodeReader = new ZXing.BrowserMultiFormatReader();
+    barcodeReader.decodeFromConstraints(
+      { video: { facingMode: 'environment' } },
+      'barcode-video',
+      (result, err) => {
+        if (result) {
+          closeBarcodeScanner();
+          fetchOpenFoodFacts(result.getText());
+        }
+      }
+    );
+  } catch (err) {
+    closeBarcodeScanner();
+    const errorBox = document.getElementById('barcode-error');
+    errorBox.textContent = 'No se pudo acceder a la cámara. Revisá los permisos.';
+    errorBox.classList.add('show');
+  }
+}
+function closeBarcodeScanner() {
+  if (barcodeReader) { try { barcodeReader.reset(); } catch (e) {} barcodeReader = null; }
+  document.getElementById('barcode-modal-overlay').style.display = 'none';
+}
+async function fetchOpenFoodFacts(barcode) {
+  const errorBox = document.getElementById('barcode-error');
+  errorBox.classList.remove('show');
+  try {
+    const res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(barcode) + '.json');
+    const data = await res.json();
+    if (data.status !== 1 || !data.product) {
+      errorBox.textContent = 'No encontré ese producto en la base de datos. Cargalo a mano.';
+      errorBox.classList.add('show');
+      return;
+    }
+    const p = data.product;
+    const n = p.nutriments || {};
+    barcodeProduct = {
+      name: p.product_name || p.generic_name || 'Producto sin nombre',
+      cal100: n['energy-kcal_100g'] != null ? Number(n['energy-kcal_100g']) : null,
+      protein100: n['proteins_100g'] != null ? Number(n['proteins_100g']) : null,
+      carbs100: n['carbohydrates_100g'] != null ? Number(n['carbohydrates_100g']) : null,
+      fat100: n['fat_100g'] != null ? Number(n['fat_100g']) : null
+    };
+    if (barcodeProduct.cal100 == null) {
+      errorBox.textContent = 'Encontré el producto pero no tiene datos de calorías cargados. Cargalo a mano.';
+      errorBox.classList.add('show');
+      return;
+    }
+    document.getElementById('barcode-result-body').innerHTML = `
+      <div class="entry-name">${escapeHtml(barcodeProduct.name)}</div>
+      <div class="entry-meta">Por 100g: ${Math.round(barcodeProduct.cal100)} kcal${barcodeProduct.protein100 != null ? ' · P ' + Math.round(barcodeProduct.protein100) + 'g' : ''}${barcodeProduct.carbs100 != null ? ' · C ' + Math.round(barcodeProduct.carbs100) + 'g' : ''}${barcodeProduct.fat100 != null ? ' · G ' + Math.round(barcodeProduct.fat100) + 'g' : ''}</div>`;
+    document.getElementById('barcode-grams').value = 100;
+    document.getElementById('barcode-result-overlay').style.display = 'flex';
+  } catch (err) {
+    errorBox.textContent = 'No se pudo consultar la base de datos. Probá de nuevo.';
+    errorBox.classList.add('show');
+  }
+}
+function confirmBarcodeProduct() {
+  if (!barcodeProduct) return;
+  const grams = Math.max(1, Number(document.getElementById('barcode-grams').value) || 100);
+  const factor = grams / 100;
+  addFood(selectedDate, {
+    name: barcodeProduct.name + ' (' + grams + 'g)',
+    calories: Math.round(barcodeProduct.cal100 * factor),
+    protein: barcodeProduct.protein100 != null ? Math.round(barcodeProduct.protein100 * factor) : null,
+    carbs: barcodeProduct.carbs100 != null ? Math.round(barcodeProduct.carbs100 * factor) : null,
+    fat: barcodeProduct.fat100 != null ? Math.round(barcodeProduct.fat100 * factor) : null,
+    source: 'barcode'
+  });
+  document.getElementById('barcode-result-overlay').style.display = 'none';
+  barcodeProduct = null;
+  renderAll();
 }
 
 async function analyzePhoto(file) {
@@ -2205,6 +2380,13 @@ function wireEvents() {
   };
 
   document.getElementById('photo-btn').onclick = () => document.getElementById('photo-input').click();
+  document.getElementById('barcode-btn').onclick = openBarcodeScanner;
+  document.getElementById('barcode-modal-close').onclick = closeBarcodeScanner;
+  document.getElementById('barcode-result-close').onclick = () => {
+    document.getElementById('barcode-result-overlay').style.display = 'none';
+    barcodeProduct = null;
+  };
+  document.getElementById('barcode-confirm').onclick = confirmBarcodeProduct;
   document.getElementById('photo-input').onchange = (e) => {
     const file = e.target.files[0];
     if (file) analyzePhoto(file);
