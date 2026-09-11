@@ -77,6 +77,17 @@ exports.handler = async (event) => {
       + 'La persona está en un objetivo calórico de ' + (payload.goalPhrase || 'mantenimiento') + ', considerá eso en el coachNote (recuperación, intensidad). '
       + 'Respondé SOLO el JSON.';
     messages = [{ role: 'user', content: prompt }];
+  } else if (payload.action === 'nutria') {
+    const catLabels = { alimentacion: 'alimentación', gimnasio: 'gimnasio', deporte: 'deporte', general: 'general (todos los datos)' };
+    const catLabel = catLabels[payload.category] || 'general';
+    const prompt = 'Sos un coach personal de nutrición y entrenamiento, cercano y directo, que le habla de vos a un usuario argentino. '
+      + 'Te paso un resumen real de sus datos de ' + catLabel + ': ' + (payload.context || 'sin datos') + '. '
+      + (payload.question
+        ? 'El usuario pregunta puntualmente: "' + payload.question + '". Respondé eso específicamente, basándote en los datos. '
+        : 'Dale un análisis breve de cómo viene, qué está funcionando y qué podría ajustar. ')
+      + 'Basate SOLO en los datos que te pasé, no inventes números. Si los datos son escasos o insuficientes para responder bien, decilo con honestidad y sugerí qué cargar para tener un análisis mejor la próxima vez. '
+      + 'Máximo 4-5 oraciones, sin relleno, tono cercano de entrenador que conoce a la persona. Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"answer": "tu respuesta"}. Respondé SOLO el JSON.';
+    messages = [{ role: 'user', content: prompt }];
   } else {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Acción desconocida' }) };
   }

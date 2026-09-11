@@ -212,6 +212,7 @@
     <button class="tab" data-tab="historial">Historial</button>
     <button class="tab" data-tab="gimnasio">Gimnasio</button>
     <button class="tab" data-tab="deporte">Deporte</button>
+    <button class="tab" data-tab="nutria">NutrIA</button>
     <button class="tab" data-tab="config">Configuración</button>
   </div>
 
@@ -477,6 +478,26 @@
           <div id="carga-breakdown"></div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- NUTRIA -->
+  <section id="tab-nutria" class="tabsection" style="display:none;">
+    <div class="panel">
+      <h3>NutrIA</h3>
+      <div class="hint" style="margin-top:0;">Preguntame sobre tu progreso — cuanto más cargues día a día, mejor te voy a poder responder.</div>
+      <div class="form-row" style="margin-top:12px;">
+        <button type="button" class="btn secondary" id="nutria-btn-alimentacion">Alimentación</button>
+        <button type="button" class="btn secondary" id="nutria-btn-gimnasio">Gimnasio</button>
+        <button type="button" class="btn secondary" id="nutria-btn-deporte">Deporte</button>
+        <button type="button" class="btn secondary" id="nutria-btn-general">Todo junto</button>
+      </div>
+      <div class="form-row" style="margin-top:14px;">
+        <div class="field grow"><label>O preguntame algo puntual</label><input type="text" id="nutria-question" placeholder="Ej: ¿voy bien para bajar 3kg este mes?"></div>
+        <button type="button" class="btn" id="nutria-ask-btn">Preguntar</button>
+      </div>
+      <div class="error-box" id="nutria-error"></div>
+      <div id="nutria-results" style="margin-top:14px;"></div>
     </div>
   </section>
 
@@ -1554,6 +1575,74 @@ function renderWhoopStatus() {
   }
 }
 
+/* ====================== NUTRIA ====================== */
+function nutriaContextFor(category) {
+  if (category === 'alimentacion') {
+    const chart = buildChartData();
+    if (!chart.length) return 'Todavía no hay días de comida cargados (necesita al menos una comida por día para contar).';
+    const last = chart.slice(-30);
+    const avgIntake = Math.round(last.reduce((s, c) => s + c.intake, 0) / last.length);
+    const avgBalance = Math.round(last.reduce((s, c) => s + c.balance, 0) / last.length);
+    const weights = state.nutrition.weights;
+    const wdates = Object.keys(weights).sort();
+    const weightTrend = wdates.length >= 2
+      ? `Peso: de ${weights[wdates[0]]}kg (${fmtLabel(wdates[0])}) a ${weights[wdates[wdates.length - 1]]}kg (${fmtLabel(wdates[wdates.length - 1])}).`
+      : 'Todavía sin suficientes registros de peso para ver tendencia.';
+    const bc = state.nutrition.bodyComp;
+    const bdates = Object.keys(bc).sort();
+    const bfTrend = bdates.length >= 2
+      ? `Grasa corporal estimada: de ${bc[bdates[0]].bodyFatPct}% a ${bc[bdates[bdates.length - 1]].bodyFatPct}%.`
+      : '';
+    return `${last.length} días trackeados (de los últimos 30). Consumo promedio ${avgIntake} kcal/día. Balance promedio: ${avgBalance >= 0 ? 'déficit' : 'superávit'} de ${Math.abs(avgBalance)} kcal/día. ${weightTrend} ${bfTrend}`;
+  }
+  if (category === 'gimnasio') {
+    const logs = state.gym.logs;
+    const dates = Object.keys(logs).sort();
+    if (!dates.length) return 'Todavía no hay entrenamientos de gimnasio cargados.';
+    const byExercise = {};
+    dates.forEach(d => logs[d].forEach(en => {
+      const key = en.exerciseName.toLowerCase();
+      const best = en.sets.reduce((b, s) => (s.weight > (b ? b.weight : -1) ? s : b), null);
+      if (!best) return;
+      if (!byExercise[key]) byExercise[key] = { name: en.exerciseName, first: { date: d, weight: best.weight, reps: best.reps }, last: { date: d, weight: best.weight, reps: best.reps } };
+      else byExercise[key].last = { date: d, weight: best.weight, reps: best.reps };
+    }));
+    const lines = Object.values(byExercise).slice(0, 8)
+      .map(e => `${e.name}: ${e.first.weight}kg (${fmtLabel(e.first.date)}) → ${e.last.weight}kg (${fmtLabel(e.last.date)})`);
+    const splitInfo = state.gym.currentRoutine ? `Split actual: ${state.gym.currentRoutine.splitName}.` : 'Sin rutina generada todavía.';
+    return `${dates.length} días de gimnasio registrados en total. Progresión por ejercicio: ${lines.join(' | ') || 'sin datos suficientes'}. ${splitInfo}`;
+  }
+  if (category === 'deporte') {
+    const logs = state.gym.sportLogs;
+    const dates = Object.keys(logs).filter(d => logs[d].length).sort();
+    if (!dates.length) return 'Todavía no hay sesiones de deporte cargadas.';
+    const bySport = {};
+    let totalLoad = 0;
+    dates.forEach(d => logs[d].forEach(en => {
+      bySport[en.sport] = (bySport[en.sport] || 0) + 1;
+      totalLoad += en.durationMin * en.rpe;
+    }));
+    const sportsLine = Object.entries(bySport).map(([s, c]) => `${s} x${c}`).join(', ');
+    return `${dates.length} días con deporte registrado. Carga acumulada (duración×RPE): ${totalLoad}. Distribución: ${sportsLine}.`;
+  }
+  return 'ALIMENTACIÓN: ' + nutriaContextFor('alimentacion') + ' | GIMNASIO: ' + nutriaContextFor('gimnasio') + ' | DEPORTE: ' + nutriaContextFor('deporte');
+}
+async function askNutria(category, question) {
+  const resultsBox = document.getElementById('nutria-results');
+  const errorBox = document.getElementById('nutria-error');
+  errorBox.classList.remove('show');
+  resultsBox.innerHTML = '<div class="empty">Pensando…</div>';
+  const context = nutriaContextFor(category);
+  try {
+    const parsed = await callAiFunction({ action: 'nutria', category, question: question || null, context });
+    resultsBox.innerHTML = `<div class="coach-note">${escapeHtml(parsed.answer || '')}</div>`;
+  } catch (err) {
+    errorBox.textContent = 'No se pudo generar el análisis. Probá de nuevo en unos minutos.';
+    errorBox.classList.add('show');
+    resultsBox.innerHTML = '';
+  }
+}
+
 async function callAiFunction(payload) {
   const res = await fetch('/.netlify/functions/ai', {
     method: 'POST',
@@ -2133,6 +2222,15 @@ function wireEvents() {
   };
   document.getElementById('push-enable-btn').onclick = enablePushNotifications;
   document.getElementById('push-disable-btn').onclick = disablePushNotifications;
+  document.getElementById('nutria-btn-alimentacion').onclick = () => askNutria('alimentacion');
+  document.getElementById('nutria-btn-gimnasio').onclick = () => askNutria('gimnasio');
+  document.getElementById('nutria-btn-deporte').onclick = () => askNutria('deporte');
+  document.getElementById('nutria-btn-general').onclick = () => askNutria('general');
+  document.getElementById('nutria-ask-btn').onclick = () => {
+    const q = document.getElementById('nutria-question').value.trim();
+    if (!q) return;
+    askNutria('general', q);
+  };
   document.getElementById('summary-modal-close').onclick = () => {
     document.getElementById('summary-modal-overlay').style.display = 'none';
   };
