@@ -68,19 +68,25 @@
   .hero-number.pos { color: #4FBE8B; }
   .hero-number.neg { color: #E38A94; }
   .hero-sub { font-size: 13px; color: #9BA3AA; margin-top: 10px; font-weight: 500; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 14px; row-gap: 16px; margin-top: 22px; border-top: 1px solid #262B2F; padding-top: 18px; }
-  .stats > div:not(:nth-child(3n)) { border-right: 1px solid #262B2F; padding-right: 12px; }
-  .stats > div:not(:nth-last-child(-n+3)) { border-bottom: 1px solid #262B2F; padding-bottom: 16px; }
+  .hero-breakdown { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 14px; margin-top: 22px; border-top: 1px solid #262B2F; padding-top: 18px; }
+  .hero-breakdown-item:not(:last-child) { border-right: 1px solid #262B2F; padding-right: 12px; }
   .stat-label { font-size: 11px; color: #8B939A; font-weight: 500; }
   .stat-value { font-size: 19px; font-weight: 800; margin-top: 4px; font-family: 'Manrope', sans-serif; color: var(--bg); font-variant-numeric: tabular-nums; }
+  .hero-goals { margin-top: 14px; font-size: 12px; color: #9BA3AA; font-weight: 500; display: flex; flex-wrap: wrap; gap: 8px; }
+  .hero-goals strong { color: var(--bg); font-weight: 800; }
+  .hero-goals-sep { color: #4A5158; }
+  .hero-vitals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .vital-pill { background: rgba(255,255,255,0.06); border-radius: 999px; padding: 6px 12px; display: flex; align-items: baseline; gap: 6px; }
+  .vital-label { font-size: 11px; color: #8B939A; font-weight: 600; }
+  .vital-value { font-size: 12px; color: var(--bg); font-weight: 800; font-family: 'Manrope', sans-serif; }
 
   .tabs {
-    display: flex; gap: 4px; flex-wrap: wrap;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
     background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
     padding: 6px; margin-bottom: 14px;
     box-shadow: 0 1px 2px rgba(20,24,28,0.04);
   }
-  .tab { background: none; border: none; cursor: pointer; padding: 9px 14px; font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 700; color: var(--ink-soft); border-radius: var(--radius-sm); }
+  .tab { background: none; border: none; cursor: pointer; padding: 9px 8px; font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 700; color: var(--ink-soft); border-radius: var(--radius-sm); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tab.active { color: #fff; background: var(--accent); }
   .subtabs {
     display: flex; gap: 4px;
@@ -227,16 +233,21 @@
     <div class="hero-number" id="hero-number"></div>
     <div class="hero-sub" id="hero-sub"></div>
     <div class="hero-sub" id="streak-badge" style="color:#F0C060; font-weight:700; margin-top:4px;"></div>
-    <div class="stats">
-      <div><div class="stat-label">Comida</div><div class="stat-value" id="stat-intake"></div></div>
-      <div><div class="stat-label">Actividad</div><div class="stat-value" id="stat-burned"></div></div>
-      <div><div class="stat-label">Deporte</div><div class="stat-value" id="stat-deporte"></div></div>
-      <div><div class="stat-label">Meta de ingesta</div><div class="stat-value" id="stat-target"></div></div>
-      <div><div class="stat-label">Mantenimiento (TDEE)</div><div class="stat-value" id="stat-tdee"></div></div>
-      <div><div class="stat-label">Recovery</div><div class="stat-value" id="stat-recovery" style="font-size:15px;"></div></div>
-      <div><div class="stat-label">Sueño</div><div class="stat-value" id="stat-sleep" style="font-size:15px;"></div></div>
-      <div><div class="stat-label">Pasos</div><div class="stat-value" id="stat-steps" style="font-size:15px;"></div></div>
-      <div><div class="stat-label">Peso</div><div class="stat-value" id="stat-weight" style="font-size:15px;"></div></div>
+    <div class="hero-breakdown">
+      <div class="hero-breakdown-item"><div class="stat-label">Comida</div><div class="stat-value" id="stat-intake"></div></div>
+      <div class="hero-breakdown-item"><div class="stat-label">Actividad</div><div class="stat-value" id="stat-burned"></div></div>
+      <div class="hero-breakdown-item"><div class="stat-label">Deporte</div><div class="stat-value" id="stat-deporte"></div></div>
+    </div>
+    <div class="hero-goals">
+      <span>Meta de ingesta <strong id="stat-target"></strong></span>
+      <span class="hero-goals-sep">·</span>
+      <span>Mantenimiento (TDEE) <strong id="stat-tdee"></strong></span>
+    </div>
+    <div class="hero-vitals">
+      <div class="vital-pill"><span class="vital-label">Recovery</span><span class="vital-value" id="stat-recovery"></span></div>
+      <div class="vital-pill"><span class="vital-label">Sueño</span><span class="vital-value" id="stat-sleep"></span></div>
+      <div class="vital-pill"><span class="vital-label">Pasos</span><span class="vital-value" id="stat-steps"></span></div>
+      <div class="vital-pill"><span class="vital-label">Peso</span><span class="vital-value" id="stat-weight"></span></div>
     </div>
   </div>
 
@@ -1725,6 +1736,7 @@ function renderSmartInsights() {
     ${escapeHtml(p.texto)}
   </div>`).join('');
 }
+let expandedGymIds = new Set();
 function renderGymLog() {
   document.getElementById('gym-log-title').textContent = 'Entrenamiento del ' + fmtLabel(selectedDate);
   const entries = state.gym.logs[selectedDate] || [];
@@ -1735,22 +1747,41 @@ function renderGymLog() {
     return;
   }
   list.innerHTML = entries.map(en => {
-    const bestWeight = Math.max(...en.sets.map(s => s.weight));
-    const pr = isNewPR(en.exerciseName, bestWeight, selectedDate);
+    const bestSet = en.sets.reduce((b, s) => (s.weight > (b ? b.weight : -1) ? s : b), null);
+    const pr = isNewPR(en.exerciseName, bestSet.weight, selectedDate);
+    const expanded = expandedGymIds.has(en.id);
     return `
-    <div class="entry" style="align-items:flex-start;">
-      <div>
-        <div class="entry-name">${escapeHtml(en.exerciseName)} <span class="entry-meta">(${escapeHtml(en.group)})</span>${pr ? ' <span style="color:var(--gold); font-weight:800; font-size:12px;">¡PR!</span>' : ''}</div>
+    <div class="entry-expandable">
+      <div class="entry" data-toggle-gym="${en.id}" style="cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="chevron ${expanded ? 'open' : ''}">›</span>
+          <div>
+            <div class="entry-name">${escapeHtml(en.exerciseName)} <span class="entry-meta">(${escapeHtml(en.group)})</span>${pr ? ' <span style="color:var(--gold); font-weight:800; font-size:12px;">¡PR!</span>' : ''}</div>
+            <div class="entry-meta">${en.sets.length} serie${en.sets.length === 1 ? '' : 's'} · mejor ${bestSet.reps}x${bestSet.weight}kg</div>
+          </div>
+        </div>
+        <div class="entry-right">
+          <button class="del" data-remove-gym="${en.id}">✕</button>
+        </div>
+      </div>
+      ${expanded ? `<div class="entry-detail" style="flex-direction:column; align-items:flex-start; gap:6px;">
         <div class="entry-meta">${en.sets.map(s => `${s.reps}x${s.weight}kg`).join(' · ')}</div>
         ${en.note ? `<div class="entry-meta">${escapeHtml(en.note)}</div>` : ''}
         <div class="entry-meta">
           <a href="${ytSearchUrl(en.exerciseName)}" target="_blank" rel="noopener" class="video-link">Ver técnica</a>
           ${en.caloriesBurned != null ? ` · ≈${en.caloriesBurned} kcal quemadas` : ' · estimando kcal…'}
         </div>
-      </div>
-      <button class="del" data-remove-gym="${en.id}">✕</button>
+      </div>` : ''}
     </div>`;
   }).join('');
+  list.querySelectorAll('[data-toggle-gym]').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('.del')) return;
+      const id = el.dataset.toggleGym;
+      if (expandedGymIds.has(id)) expandedGymIds.delete(id); else expandedGymIds.add(id);
+      renderGymLog();
+    };
+  });
 
   const total = gymDayTotalCalories();
   const totalBox = document.getElementById('gym-day-total');
