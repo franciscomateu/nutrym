@@ -31,7 +31,7 @@
     --danger-soft: #F1DEE1;
     --slate: #33475B;
     --slate-soft: #E4E9EE;
-    --radius: 16px;
+    --radius: 20px;
     --radius-sm: 10px;
   }
   * { box-sizing: border-box; }
@@ -92,14 +92,30 @@
   .subtab.active { color: #fff; background: var(--slate); }
 
   .panel {
-    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
     padding: 20px; margin-bottom: 14px;
-    box-shadow: 0 1px 2px rgba(20,24,28,0.04);
+    box-shadow: 0 2px 10px rgba(20,24,28,0.05), 0 1px 2px rgba(20,24,28,0.04);
   }
   .panel h3 { font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 800; margin: 0 0 14px; letter-spacing: -0.01em; }
 
+  /* Tinte sutil por categoría — misma estructura de panel, distinta identidad visual según la sección */
+  #tab-alimentacion .panel { border-left: 3px solid var(--accent); background: linear-gradient(180deg, var(--accent-soft) 0%, var(--card) 90px); }
+  #tab-actividad .panel { border-left: 3px solid var(--slate); background: linear-gradient(180deg, var(--slate-soft) 0%, var(--card) 90px); }
+  #tab-historial .panel { border-left: 3px solid var(--gold); background: linear-gradient(180deg, var(--gold-soft) 0%, var(--card) 90px); }
+  #tab-dispositivos .panel { border-left: 3px solid var(--slate); }
+  #tab-nutria .panel { border-left: 3px solid var(--gold); }
+  #tab-config .panel { border-left: 3px solid var(--card-border); }
+
   .entry { display: flex; justify-content: space-between; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 8px; }
   .entry:last-child { border-bottom: none; }
+  .entry-expandable:last-child .entry { border-bottom: none; }
+  .chevron { display: inline-block; color: var(--ink-soft); font-size: 15px; font-weight: 800; transform: rotate(90deg); transition: transform 0.15s; }
+  .chevron.open { transform: rotate(180deg); }
+  .entry-detail { padding: 0 0 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .macro-chip { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; font-family: 'Manrope', sans-serif; }
+  .macro-protein { background: var(--accent-soft); color: #175A3B; }
+  .macro-carbs { background: var(--gold-soft); color: #7A5A1C; }
+  .macro-fat { background: var(--danger-soft); color: #6E2030; }
   .entry-name { font-weight: 700; }
   .entry-meta { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -135,6 +151,10 @@
   .suggestion.show { display: block; }
   .suggestion-title { font-weight: 800; margin-bottom: 4px; font-family: 'Manrope', sans-serif; }
   .suggestion-macros { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+  .size-chip { background: var(--bg); border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Manrope', sans-serif; color: var(--ink); text-align: left; }
+  .size-chip .size-chip-sub { display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-top: 2px; }
+  .size-chip.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .size-chip.selected .size-chip-sub { color: #D8EFE2; }
   .error-box { background: var(--danger-soft); color: #6E2030; border-radius: var(--radius-sm); padding: 11px 14px; font-size: 13px; margin-top: 12px; display: none; font-weight: 500; }
   .error-box.show { display: block; }
   .hint { font-size: 12px; color: var(--ink-soft); margin-top: 10px; line-height: 1.55; }
@@ -262,12 +282,10 @@
         <div class="suggestion-title">Sugerencia de la foto</div>
         <div class="suggestion-macros" id="suggestion-meta"></div>
         <div class="coach-note" id="suggestion-comment" style="display:none;"></div>
-        <div class="hint" style="margin-top:0;">¿La porción real era más chica o más grande que lo que asumió la IA?</div>
-        <div class="form-row" style="margin-top:8px;">
-          <button type="button" class="btn secondary" data-portion-adjust="0.5">Bastante menos</button>
-          <button type="button" class="btn secondary" data-portion-adjust="0.75">Un poco menos</button>
-          <button type="button" class="btn secondary" data-portion-adjust="1.25">Un poco más</button>
-          <button type="button" class="btn secondary" data-portion-adjust="1.5">Bastante más</button>
+        <div id="size-question-wrap" style="display:none;">
+          <div class="hint" style="margin-top:0;" id="size-question-label"></div>
+          <div class="form-row" id="size-options-row" style="margin-top:8px;"></div>
+          <div class="hint" id="sides-line" style="margin-top:8px;"></div>
         </div>
         <div class="form-row" style="margin-top:14px;">
           <div class="field grow"><label>Alimento</label><input type="text" id="sugg-name"></div>
@@ -1117,25 +1135,44 @@ function computeStreak() {
 }
 
 /* ====================== RENDER: DÍA ====================== */
+let expandedFoodIds = new Set();
 function renderFoods() {
   const d = dayData(selectedDate);
   const list = document.getElementById('foods-list');
   if (!d.foods.length) { list.innerHTML = '<div class="empty">Todavía no cargaste comidas para este día.</div>'; return; }
-  list.innerHTML = d.foods.map(f => `
-    <div class="entry">
-      <div>
-        <div class="entry-name">${escapeHtml(f.name)}</div>
-        <div class="entry-meta">${f.source === 'photo' ? 'Estimado por foto · ' : ''}${[
-          f.protein != null ? 'P ' + f.protein + 'g' : null,
-          f.carbs != null ? 'C ' + f.carbs + 'g' : null,
-          f.fat != null ? 'G ' + f.fat + 'g' : null
-        ].filter(Boolean).join(' · ')}</div>
+  list.innerHTML = d.foods.map(f => {
+    const expanded = expandedFoodIds.has(f.id);
+    const macros = [
+      f.protein != null ? `<span class="macro-chip macro-protein">P ${f.protein}g</span>` : '',
+      f.carbs != null ? `<span class="macro-chip macro-carbs">C ${f.carbs}g</span>` : '',
+      f.fat != null ? `<span class="macro-chip macro-fat">G ${f.fat}g</span>` : ''
+    ].filter(Boolean).join('');
+    return `
+    <div class="entry-expandable">
+      <div class="entry" data-toggle-food="${f.id}" style="cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="chevron ${expanded ? 'open' : ''}">›</span>
+          <div>
+            <div class="entry-name">${escapeHtml(f.name)}</div>
+            ${f.source === 'photo' ? '<div class="entry-meta">Estimado por foto</div>' : ''}
+          </div>
+        </div>
+        <div class="entry-right">
+          <div class="entry-cal">${f.calories} kcal</div>
+          <button class="del" data-remove-food="${f.id}">✕</button>
+        </div>
       </div>
-      <div class="entry-right">
-        <div class="entry-cal">${f.calories} kcal</div>
-        <button class="del" data-remove-food="${f.id}">✕</button>
-      </div>
-    </div>`).join('');
+      ${expanded && macros ? `<div class="entry-detail">${macros}</div>` : ''}
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-toggle-food]').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('.del')) return;
+      const id = el.dataset.toggleFood;
+      if (expandedFoodIds.has(id)) expandedFoodIds.delete(id); else expandedFoodIds.add(id);
+      renderFoods();
+    };
+  });
 }
 let editingActivityId = null;
 function renderActivities() {
@@ -2274,6 +2311,7 @@ function confirmBarcodeProduct() {
   renderAll();
 }
 
+let currentPhotoSuggestion = null;
 async function analyzePhoto(file) {
   const errorBox = document.getElementById('photo-error');
   const suggestionBox = document.getElementById('photo-suggestion');
@@ -2288,12 +2326,33 @@ async function analyzePhoto(file) {
       reader.readAsDataURL(file);
     });
     const parsed = await callAiFunction({ action: 'foto', image: base64, mediaType: file.type || 'image/jpeg' });
+    currentPhotoSuggestion = parsed;
     document.getElementById('sugg-name').value = parsed.name || 'Comida sin nombre';
     document.getElementById('sugg-quantity').value = 1;
-    document.getElementById('sugg-cal').value = Math.round(Number(parsed.calories)) || 0;
-    document.getElementById('sugg-protein').value = parsed.protein_g != null ? Math.round(Number(parsed.protein_g)) : '';
-    document.getElementById('sugg-carbs').value = parsed.carbs_g != null ? Math.round(Number(parsed.carbs_g)) : '';
-    document.getElementById('sugg-fat').value = parsed.fat_g != null ? Math.round(Number(parsed.fat_g)) : '';
+    const wrap = document.getElementById('size-question-wrap');
+    if (parsed.mainItem && Array.isArray(parsed.mainItem.sizeOptions) && parsed.mainItem.sizeOptions.length) {
+      wrap.style.display = 'block';
+      document.getElementById('size-question-label').textContent = `¿Qué tamaño tenía "${parsed.mainItem.label}"?`;
+      const row = document.getElementById('size-options-row');
+      row.innerHTML = parsed.mainItem.sizeOptions.map((opt, i) =>
+        `<button type="button" class="size-chip" data-size-idx="${i}">${escapeHtml(opt.label)}<span class="size-chip-sub">${opt.grams}g · ${opt.calories} kcal</span></button>`
+      ).join('');
+      const sides = parsed.sides;
+      document.getElementById('sides-line').textContent = (sides && sides.label)
+        ? `Acompañamientos (${sides.label}): ${sides.calories} kcal — estimado por separado, no afecta la elección de arriba.`
+        : '';
+      row.querySelectorAll('.size-chip').forEach(btn => {
+        btn.onclick = () => selectPhotoSizeOption(Number(btn.dataset.sizeIdx));
+      });
+      const initialIdx = parsed.mainItem.bestGuessIndex != null ? parsed.mainItem.bestGuessIndex : 0;
+      selectPhotoSizeOption(initialIdx);
+    } else {
+      wrap.style.display = 'none';
+      document.getElementById('sugg-cal').value = Math.round(Number(parsed.calories)) || 0;
+      document.getElementById('sugg-protein').value = parsed.protein_g != null ? Math.round(Number(parsed.protein_g)) : '';
+      document.getElementById('sugg-carbs').value = parsed.carbs_g != null ? Math.round(Number(parsed.carbs_g)) : '';
+      document.getElementById('sugg-fat').value = parsed.fat_g != null ? Math.round(Number(parsed.fat_g)) : '';
+    }
     document.getElementById('suggestion-meta').textContent =
       'Confianza: ' + (parsed.confidence || 'sin dato') + (parsed.note ? ' · ' + parsed.note : '');
     const commentBox = document.getElementById('suggestion-comment');
@@ -2306,6 +2365,18 @@ async function analyzePhoto(file) {
   }
   photoBtn.disabled = false; photoBtn.textContent = 'Cargar por foto';
   document.getElementById('photo-input').value = '';
+}
+function selectPhotoSizeOption(idx) {
+  const parsed = currentPhotoSuggestion;
+  if (!parsed || !parsed.mainItem) return;
+  const opt = parsed.mainItem.sizeOptions[idx];
+  if (!opt) return;
+  document.querySelectorAll('#size-options-row .size-chip').forEach((btn, i) => btn.classList.toggle('selected', i === idx));
+  const sides = parsed.sides || { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+  document.getElementById('sugg-cal').value = Math.round(Number(opt.calories) + Number(sides.calories || 0));
+  document.getElementById('sugg-protein').value = Math.round(Number(opt.protein_g || 0) + Number(sides.protein_g || 0));
+  document.getElementById('sugg-carbs').value = Math.round(Number(opt.carbs_g || 0) + Number(sides.carbs_g || 0));
+  document.getElementById('sugg-fat').value = Math.round(Number(opt.fat_g || 0) + Number(sides.fat_g || 0));
 }
 
 function onFoodNameInput() {
@@ -2849,15 +2920,6 @@ function wireEvents() {
     if (file) analyzePhoto(file);
   };
   document.getElementById('sugg-discard').onclick = () => document.getElementById('photo-suggestion').classList.remove('show');
-  document.querySelectorAll('[data-portion-adjust]').forEach(btn => {
-    btn.onclick = () => {
-      const factor = Number(btn.dataset.portionAdjust);
-      ['sugg-cal', 'sugg-protein', 'sugg-carbs', 'sugg-fat'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el.value !== '') el.value = Math.round(Number(el.value) * factor);
-      });
-    };
-  });
   document.getElementById('suggest-meals-btn').onclick = suggestMeals;
   document.getElementById('sugg-confirm').onclick = () => {
     const qty = Math.max(1, Math.round(Number(document.getElementById('sugg-quantity').value)) || 1);
