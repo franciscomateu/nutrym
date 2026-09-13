@@ -572,6 +572,11 @@
   <!-- NUTRIA -->
   <section id="tab-nutria" class="tabsection" style="display:none;">
     <div class="panel">
+      <h3>Insights inteligentes</h3>
+      <div class="hint" style="margin-top:0;">Patrones detectados entre tu recovery/sueño (Whoop) y tu rendimiento — solo se muestran cuando hay suficiente evidencia, no una sola coincidencia.</div>
+      <div id="smart-insights-content" style="margin-top:12px;"></div>
+    </div>
+    <div class="panel">
       <h3>NutrIA</h3>
       <div class="hint" style="margin-top:0;">Preguntame sobre tu progreso — cuanto más cargues día a día, mejor te voy a poder responder.</div>
       <div class="form-row" style="margin-top:12px;">
@@ -891,6 +896,7 @@ async function loadAll() {
   if (state.gym.pushSubscription === undefined) state.gym.pushSubscription = null;
   if (state.gym.whoopVitals === undefined) state.gym.whoopVitals = null;
   if (!state.gym.whoopImportedIds) state.gym.whoopImportedIds = [];
+  if (!state.gym.whoopHistory) state.gym.whoopHistory = {};
 
   // Fotos de progreso
   const localPhotosPending = localStorage.getItem(pendingKey('photos')) === '1';
@@ -1246,18 +1252,41 @@ function buildChartData() {
     return { date: d, label: fmtLabel(d), intake, burned, balance, target };
   }).slice(-30);
 }
+function average(arr) { return arr.reduce((s, x) => s + x, 0) / arr.length; }
 function computeSuggestedTDEE() {
-  const wdates = Object.keys(state.nutrition.weights).sort();
+  const WINDOW_DAYS = 21;
+  const allWdates = Object.keys(state.nutrition.weights).sort();
+  if (allWdates.length < 2) return null;
+
+  // Preferimos una ventana móvil reciente (más "adaptativo" a cambios de actividad),
+  // pero si no hay suficientes pesajes recientes, caemos a los últimos 6 disponibles.
+  const windowStart = addDaysStr(todayStr(), -WINDOW_DAYS);
+  let wdates = allWdates.filter(d => d >= windowStart);
+  if (wdates.length < 2) wdates = allWdates.slice(-Math.min(allWdates.length, 6));
   if (wdates.length < 2) return null;
-  const first = wdates[0], last = wdates[wdates.length - 1];
-  const daysBetween = Math.round((new Date(last) - new Date(first)) / 86400000);
-  if (daysBetween < 10) return null;
-  const weightChange = state.nutrition.weights[last] - state.nutrition.weights[first];
-  const chart = buildChartData().filter(c => c.date >= first && c.date <= last);
+
+  const firstDate = wdates[0], lastDate = wdates[wdates.length - 1];
+  const daysBetween = Math.round((new Date(lastDate) - new Date(firstDate)) / 86400000);
+  if (daysBetween < 7) return null; // ventana muy corta para ser confiable
+
+  // Promedio de hasta 3 pesajes al inicio/fin en vez de un solo dato puntual,
+  // para amortiguar ruido de retención de líquidos/sodio.
+  const n = Math.min(3, wdates.length);
+  const startAvg = average(wdates.slice(0, n).map(d => state.nutrition.weights[d]));
+  const endAvg = average(wdates.slice(-n).map(d => state.nutrition.weights[d]));
+  const weightChange = endAvg - startAvg;
+
+  const chart = buildChartData().filter(c => c.date >= firstDate && c.date <= lastDate);
   if (chart.length < 5) return null;
   const avgIntake = Math.round(chart.reduce((s, c) => s + c.intake, 0) / chart.length);
   const suggested = Math.round(avgIntake + (weightChange * 7700 / daysBetween));
-  return { suggested, avgIntake, weightChange: Math.round(weightChange * 10) / 10, days: daysBetween, trackedDays: chart.length };
+
+  const coverage = chart.length / (daysBetween + 1);
+  let confianza = 'baja';
+  if (daysBetween >= 14 && coverage >= 0.7 && wdates.length >= 3) confianza = 'alta';
+  else if (daysBetween >= 10 && coverage >= 0.5) confianza = 'media';
+
+  return { suggested, avgIntake, weightChange: Math.round(weightChange * 10) / 10, days: daysBetween, trackedDays: chart.length, confianza };
 }
 function renderTdeeSuggestion() {
   const box = document.getElementById('tdee-suggestion');
@@ -1265,7 +1294,22 @@ function renderTdeeSuggestion() {
   if (!result) { box.innerHTML = ''; return; }
   const current = state.nutrition.settings.tdeeSedentario;
   const diff = result.suggested - current;
-  box.innerHTML = `<div class="coach-note">Según tu peso (${result.weightChange >= 0 ? '+' : ''}${result.weightChange}kg en ${result.days} días) y tu consumo real promedio (${result.avgIntake} kcal en ${result.trackedDays} días trackeados), tu TDEE real ronda los <strong>${result.suggested} kcal</strong> — hoy tenés cargado ${current} kcal como Sedentario (${diff >= 0 ? '+' : ''}${diff} kcal de diferencia). Si la diferencia es grande y se sostiene en el tiempo, valdría la pena ajustarlo en Configuración.</div>`;
+  const confBadge = { alta: '🟢 Confianza alta', media: '🟡 Confianza media', baja: '🟠 Confianza baja' }[result.confianza];
+  box.innerHTML = `<div class="coach-note">
+    <span class="avg-badge" style="margin-bottom:8px;">${confBadge}</span><br>
+    Según tu peso (${result.weightChange >= 0 ? '+' : ''}${result.weightChange}kg en ${result.days} días) y tu consumo real promedio (${result.avgIntake} kcal en ${result.trackedDays} días trackeados), tu TDEE real ronda los <strong>${result.suggested} kcal</strong> — hoy tenés cargado ${current} kcal como Sedentario (${diff >= 0 ? '+' : ''}${diff} kcal de diferencia).
+    ${Math.abs(diff) >= 100 ? `<div style="margin-top:10px;"><button class="btn secondary" id="tdee-apply-btn">Aplicar ${result.suggested} kcal como Sedentario</button></div>` : ''}
+  </div>`;
+  const applyBtn = document.getElementById('tdee-apply-btn');
+  if (applyBtn) {
+    applyBtn.onclick = () => {
+      state.nutrition.settings.tdeeSedentario = result.suggested;
+      state.nutrition.settings.tdeeIntermedio = Math.round(result.suggested * 1.07);
+      state.nutrition.settings.tdeeActivo = Math.round(result.suggested * 1.14);
+      persistNutrition();
+      renderAll();
+    };
+  }
 }
 function renderHistorial() {
   renderTdeeSuggestion();
@@ -1575,6 +1619,75 @@ function isNewPR(exerciseName, weight, excludeDate) {
   });
   return maxWeight > 0 && weight > maxWeight;
 }
+function dayHadPR(dateStr) {
+  const entries = state.gym.logs[dateStr] || [];
+  return entries.some(en => en.sets.some(s => isNewPR(en.exerciseName, s.weight, dateStr)));
+}
+function computeDayBalance(dateStr) {
+  const totals = computeDayTotals(dateStr);
+  return tdeeFor(dateStr) + totals.burned - totals.intake;
+}
+// Detección de patrones por reglas simples (no correlación estadística formal):
+// con el volumen de datos de un solo usuario, un ratio de confirmación sobre
+// ocurrencias reales es más honesto que forzar un coeficiente de correlación
+// que necesitaría muchas más muestras para no ser ruido.
+function detectPatterns() {
+  const patterns = [];
+  const wh = state.gym.whoopHistory || {};
+  const whDates = Object.keys(wh).sort();
+  const MIN_OCURRENCIAS = 5;
+  const RATIO_MINIMO = 0.6;
+
+  // Patrón 1: recovery bajo (<50%) el día del entrenamiento vs. ausencia de PR ese día
+  const gymDays = whDates.filter(d => wh[d].recoveryScore != null && state.gym.logs[d] && state.gym.logs[d].length);
+  const lowRecoveryGymDays = gymDays.filter(d => wh[d].recoveryScore < 50);
+  if (lowRecoveryGymDays.length >= MIN_OCURRENCIAS) {
+    const sinPR = lowRecoveryGymDays.filter(d => !dayHadPR(d)).length;
+    const ratio = sinPR / lowRecoveryGymDays.length;
+    if (ratio >= RATIO_MINIMO) {
+      patterns.push({
+        texto: `En ${sinPR} de tus últimos ${lowRecoveryGymDays.length} entrenamientos con recovery bajo (menor a 50%), no marcaste ningún PR.`,
+        confianza: ratio >= 0.75 ? 'alta' : 'media'
+      });
+    }
+  }
+
+  // Patrón 2: dormir poco (<6hs) vs. superávit calórico al día siguiente
+  const sleepDates = whDates.filter(d => wh[d].sleepHours != null);
+  const pairsSleep = sleepDates
+    .map(d => ({ sleepDate: d, nextDate: addDaysStr(d, 1) }))
+    .filter(p => state.nutrition.days[p.nextDate] && state.nutrition.days[p.nextDate].foods && state.nutrition.days[p.nextDate].foods.length);
+  const lowSleepPairs = pairsSleep.filter(p => wh[p.sleepDate].sleepHours < 6);
+  if (lowSleepPairs.length >= MIN_OCURRENCIAS) {
+    const conSuperavit = lowSleepPairs.filter(p => computeDayBalance(p.nextDate) < 0).length;
+    const ratio = conSuperavit / lowSleepPairs.length;
+    if (ratio >= RATIO_MINIMO) {
+      patterns.push({
+        texto: `Después de ${conSuperavit} de tus últimas ${lowSleepPairs.length} noches con menos de 6hs de sueño, terminaste el día siguiente en superávit calórico.`,
+        confianza: ratio >= 0.75 ? 'alta' : 'media'
+      });
+    }
+  }
+
+  return patterns;
+}
+function renderSmartInsights() {
+  const box = document.getElementById('smart-insights-content');
+  if (!box) return;
+  const patterns = detectPatterns();
+  const wh = state.gym.whoopHistory || {};
+  const dataPoints = Object.keys(wh).length;
+  if (!patterns.length) {
+    box.innerHTML = `<div class="empty">${state.gym.whoop
+      ? `Todavía no hay suficientes datos cruzados para detectar patrones (llevás ${dataPoints} día${dataPoints === 1 ? '' : 's'} de Whoop registrados — necesitás al menos 5 casos comparables de cada tipo). Se van sumando solos con el resumen diario.`
+      : 'Conectá Whoop en Dispositivos para habilitar la detección de patrones entre recovery/sueño y tu rendimiento.'}</div>`;
+    return;
+  }
+  box.innerHTML = patterns.map(p => `<div class="coach-note" style="margin-bottom:10px;">
+    <span class="avg-badge" style="margin-bottom:6px;">${p.confianza === 'alta' ? '🟢 Confianza alta' : '🟡 Confianza media'}</span><br>
+    ${escapeHtml(p.texto)}
+  </div>`).join('');
+}
 function renderGymLog() {
   document.getElementById('gym-log-title').textContent = 'Entrenamiento del ' + fmtLabel(selectedDate);
   const entries = state.gym.logs[selectedDate] || [];
@@ -1736,6 +1849,7 @@ function renderAll() {
   renderWhoopVitalsStatus();
   renderAppleHealth();
   renderPushStatus();
+  renderSmartInsights();
 }
 
 /* ====================== IA: fotos y rutina (vía función serverless) ====================== */
@@ -1988,8 +2102,13 @@ async function whoopFetchVitals() {
       respiratoryRate: sl && sl.respiratory_rate != null ? Math.round(sl.respiratory_rate * 10) / 10 : null,
       fetchedAt: new Date().toISOString()
     };
+    state.gym.whoopHistory[todayStr()] = {
+      recoveryScore: state.gym.whoopVitals.recoveryScore,
+      sleepHours: state.gym.whoopVitals.sleepHours
+    };
     await persistGym();
     renderWhoopVitalsStatus();
+    renderSmartInsights();
   } catch (err) {
     errorBox.textContent = 'No se pudo traer los datos de Whoop. Probá de nuevo en unos minutos.';
     errorBox.classList.add('show');
@@ -2045,7 +2164,9 @@ function nutriaContextFor(category) {
     const sportsLine = Object.entries(bySport).map(([s, c]) => `${s} x${c}`).join(', ');
     return `${dates.length} días con deporte registrado. Carga acumulada (duración×RPE): ${totalLoad}. Distribución: ${sportsLine}.`;
   }
-  return 'ALIMENTACIÓN: ' + nutriaContextFor('alimentacion') + ' | GIMNASIO: ' + nutriaContextFor('gimnasio') + ' | DEPORTE: ' + nutriaContextFor('deporte');
+  const patterns = detectPatterns();
+  const patternsLine = patterns.length ? ' | PATRONES DETECTADOS: ' + patterns.map(p => p.texto).join(' ') : '';
+  return 'ALIMENTACIÓN: ' + nutriaContextFor('alimentacion') + ' | GIMNASIO: ' + nutriaContextFor('gimnasio') + ' | DEPORTE: ' + nutriaContextFor('deporte') + patternsLine;
 }
 async function askNutria(category, question) {
   const resultsBox = document.getElementById('nutria-results');

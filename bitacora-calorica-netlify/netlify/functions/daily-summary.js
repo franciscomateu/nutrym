@@ -144,16 +144,26 @@ exports.handler = async () => {
           fetchWhoopLatest('/recovery', token),
           fetchWhoopLatest('/activity/sleep', token)
         ]);
+        let recoveryScoreToday = null, sleepHrsToday = null;
         if (recovery && recovery.score) {
-          whoopSummary += `Recovery: ${Math.round(recovery.score.recovery_score)}%. `;
+          recoveryScoreToday = Math.round(recovery.score.recovery_score);
+          whoopSummary += `Recovery: ${recoveryScoreToday}%. `;
         }
         if (sleep && sleep.score) {
           const sleepMs = sleep.score.stage_summary ? sleep.score.stage_summary.total_in_bed_time_milli : null;
-          const sleepHrs = sleepMs ? Math.round((sleepMs / 3600000) * 10) / 10 : null;
-          if (sleepHrs) whoopSummary += `Dormiste ${sleepHrs}hs. `;
+          sleepHrsToday = sleepMs ? Math.round((sleepMs / 3600000) * 10) / 10 : null;
+          if (sleepHrsToday) whoopSummary += `Dormiste ${sleepHrsToday}hs. `;
           if (sleep.score.sleep_performance_percentage != null) {
             whoopSummary += `Sleep performance: ${Math.round(sleep.score.sleep_performance_percentage)}%. `;
           }
+        }
+        // Guardamos el dato de hoy en el historial, corra o no corra la app —
+        // esto es lo que permite que la detección de patrones tenga datos reales
+        // día tras día en vez de depender de que el usuario sincronice a mano.
+        if (recoveryScoreToday != null || sleepHrsToday != null) {
+          if (!gym.whoopHistory) gym.whoopHistory = {};
+          gym.whoopHistory[today] = { recoveryScore: recoveryScoreToday, sleepHours: sleepHrsToday };
+          gymChanged = true;
         }
       }
     }
