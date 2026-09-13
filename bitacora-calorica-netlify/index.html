@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Nutrym">
 <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<link rel="icon" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+<link rel="icon" href="/icons/favicon-32.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -38,7 +38,7 @@
   body {
     margin: 0; font-family: 'Manrope', sans-serif; color: var(--ink); background: var(--bg);
     padding-top: env(safe-area-inset-top);
-    padding-bottom: calc(40px + env(safe-area-inset-bottom));
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
@@ -81,12 +81,16 @@
   .vital-value { font-size: 12px; color: var(--bg); font-weight: 800; font-family: 'Manrope', sans-serif; }
 
   .tabs {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
-    padding: 6px; margin-bottom: 14px;
-    box-shadow: 0 1px 2px rgba(20,24,28,0.04);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px;
+    background: var(--card); border-top: 1px solid var(--card-border);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    box-shadow: 0 -2px 10px rgba(20,24,28,0.06);
   }
-  .tab { background: none; border: none; cursor: pointer; padding: 9px 8px; font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 700; color: var(--ink-soft); border-radius: var(--radius-sm); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab { background: none; border: none; cursor: pointer; padding: 6px 2px; font-family: 'Manrope', sans-serif; color: var(--ink-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .tab svg { width: 20px; height: 20px; }
+  .tab-label { font-size: 9.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tab.active { color: var(--accent); background: var(--accent-soft); }
   .tab.active { color: #fff; background: var(--accent); }
   .subtabs {
     display: flex; gap: 4px;
@@ -122,6 +126,7 @@
   .macro-protein { background: var(--accent-soft); color: #175A3B; }
   .macro-carbs { background: var(--gold-soft); color: #7A5A1C; }
   .macro-fat { background: var(--danger-soft); color: #6E2030; }
+  .food-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
   .entry-name { font-weight: 700; }
   .entry-meta { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -252,12 +257,30 @@
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-tab="alimentacion">Alimentación</button>
-    <button class="tab" data-tab="actividad">Actividad</button>
-    <button class="tab" data-tab="dispositivos">Dispositivos</button>
-    <button class="tab" data-tab="nutria">NutrIA</button>
-    <button class="tab" data-tab="historial">Historial</button>
-    <button class="tab" data-tab="config">Configuración</button>
+    <button class="tab active" data-tab="alimentacion">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V2M9 11v11M15 2c-1.5 1.5-2 3-2 5s.5 3.5 2 5c1.5-1.5 2-3 2-5s-.5-3.5-2-5zM15 13v10"/></svg>
+      <span class="tab-label">Alimentación</span>
+    </button>
+    <button class="tab" data-tab="actividad">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5 17.5 17.5M4 8l3-3M20 16l-3 3M2 10l3-3M22 14l-3 3M8 4l3 3M16 20l3-3"/></svg>
+      <span class="tab-label">Actividad</span>
+    </button>
+    <button class="tab" data-tab="dispositivos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="16" rx="2"/><path d="M11 18h2"/></svg>
+      <span class="tab-label">Dispositivos</span>
+    </button>
+    <button class="tab" data-tab="nutria">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>
+      <span class="tab-label">NutrIA</span>
+    </button>
+    <button class="tab" data-tab="historial">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+      <span class="tab-label">Historial</span>
+    </button>
+    <button class="tab" data-tab="config">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span class="tab-label">Configuración</span>
+    </button>
   </div>
 
   <!-- ALIMENTACIÓN -->
@@ -502,7 +525,7 @@
   <section id="tab-historial" class="tabsection" style="display:none;">
     <div class="panel">
       <h3>Evolución</h3>
-      <div id="historial-empty" class="empty">Cargá algunos días para ver el histórico acá.</div>
+      <div id="historial-empty" class="empty">Todavía no hay suficiente historia — a medida que cargues días, tu evolución va a ir apareciendo acá.</div>
       <div id="historial-content" style="display:none;">
         <div class="avg-badge" id="avg-badge"></div>
         <div class="hint" id="week-comparison-text" style="margin-top:-8px; margin-bottom:14px;"></div>
@@ -522,7 +545,7 @@
         <button type="submit" class="btn">Registrar</button>
       </form>
       <div class="hint">Con una carga por semana alcanza — no hace falta pesarte todos los días.</div>
-      <div id="weight-empty" class="empty" style="margin-top:14px;">Registrá tu peso para ver la evolución acá.</div>
+      <div id="weight-empty" class="empty" style="margin-top:14px;">Cargá tu primer peso para que empiece a dibujarse la curva.</div>
       <div id="weight-content" style="display:none; margin-top:14px;">
         <div id="weight-comparison" class="coach-note"></div>
         <div class="chart-title">Peso registrado vs. peso esperado según tu déficit acumulado</div>
@@ -550,7 +573,7 @@
 
     <div class="panel">
       <h3>Resúmenes diarios</h3>
-      <div id="summaries-empty" class="empty">Todavía no se generó ningún resumen diario.</div>
+      <div id="summaries-empty" class="empty">Tu primer resumen nocturno va a aparecer acá después de la próxima medianoche.</div>
       <div id="summaries-list"></div>
     </div>
 
@@ -561,8 +584,9 @@
       <button type="button" class="btn secondary" id="progress-photo-btn">Subir foto de hoy</button>
       <div class="error-box" id="progress-photo-error"></div>
       <div class="hint">Se comprime automáticamente antes de guardarse — no ocupa casi espacio.</div>
-      <div id="photos-empty" class="empty" style="margin-top:14px;">Todavía no subiste ninguna foto.</div>
+      <div id="photos-empty" class="empty" style="margin-top:14px;">Subí tu primera foto de progreso para arrancar a comparar tu evolución.</div>
       <div id="photos-strip" style="display:flex; gap:10px; overflow-x:auto; margin-top:14px; padding-bottom:4px;"></div>
+      <button type="button" class="btn secondary" id="compare-photos-btn" style="display:none; margin-top:12px;">Comparar antes / ahora</button>
     </div>
   </section>
 
@@ -696,6 +720,25 @@
       <button class="btn secondary" id="photo-lightbox-delete">Eliminar</button>
       <button class="btn" id="photo-lightbox-close">Cerrar</button>
     </div>
+  </div>
+</div>
+
+<div id="compare-photos-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">Comparar progreso</div>
+    <div class="form-row">
+      <div class="field grow"><label>Antes</label><select id="compare-select-before"></select></div>
+      <div class="field grow"><label>Ahora</label><select id="compare-select-after"></select></div>
+    </div>
+    <div id="compare-slider-wrap" style="position:relative; width:100%; aspect-ratio:3/4; margin-top:14px; border-radius:10px; overflow:hidden; background:var(--bg); touch-action:none;">
+      <img id="compare-img-before" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">
+      <img id="compare-img-after" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; clip-path: inset(0 50% 0 0);">
+      <div id="compare-divider" style="position:absolute; top:0; bottom:0; left:50%; width:2px; background:#fff; pointer-events:none; box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>
+      <div style="position:absolute; top:8px; left:8px; background:rgba(20,24,28,0.6); color:#fff; font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px;">Antes</div>
+      <div style="position:absolute; top:8px; right:8px; background:rgba(20,24,28,0.6); color:#fff; font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px;">Ahora</div>
+    </div>
+    <input type="range" id="compare-range" min="0" max="100" value="50" style="width:100%; margin-top:12px;">
+    <div style="margin-top:12px;"><button class="btn" id="compare-photos-close">Cerrar</button></div>
   </div>
 </div>
 
@@ -943,6 +986,7 @@ async function loadAll() {
     if (cached) { state.photos = cached; markPending('photos', true); }
   }
   if (!state.photos.photos) state.photos.photos = {};
+  if (!state.photos.foodPhotos) state.photos.foodPhotos = {};
 }
 
 /* ====================== NUTRICIÓN: helpers de datos ====================== */
@@ -974,13 +1018,19 @@ function tdeeFor(dateStr) {
 }
 function addFood(dateStr, food) {
   const d = ensureDay(dateStr);
-  d.foods.push({ id: uid(), time: new Date().toISOString(), ...food });
+  const entry = { id: uid(), time: new Date().toISOString(), ...food };
+  d.foods.push(entry);
   persistNutrition();
+  return entry;
 }
 function removeFood(dateStr, id) {
   const d = ensureDay(dateStr);
   d.foods = d.foods.filter(f => f.id !== id);
   persistNutrition();
+  if (state.photos.foodPhotos && state.photos.foodPhotos[id]) {
+    delete state.photos.foodPhotos[id];
+    persistPhotos();
+  }
 }
 function addActivity(dateStr, act) {
   const d = ensureDay(dateStr);
@@ -1103,6 +1153,28 @@ function computeDayTotals(dateStr) {
   const burned = actividadBurned + deporteBurned;
   return { intake, burned, actividadBurned, deporteBurned };
 }
+let lastHeroBalance = null;
+function animateHeroNumber(balance) {
+  const numEl = document.getElementById('hero-number');
+  const from = lastHeroBalance == null ? balance : lastHeroBalance;
+  lastHeroBalance = balance;
+  if (from === balance) {
+    numEl.textContent = (balance >= 0 ? '−' : '+') + Math.abs(balance) + ' kcal';
+    numEl.className = 'hero-number ' + (balance >= 0 ? 'pos' : 'neg');
+    return;
+  }
+  const start = performance.now();
+  const duration = 450;
+  function tick(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const current = Math.round(from + (balance - from) * eased);
+    numEl.textContent = (current >= 0 ? '−' : '+') + Math.abs(current) + ' kcal';
+    numEl.className = 'hero-number ' + (current >= 0 ? 'pos' : 'neg');
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
 function renderHero() {
   const { deficitGoal } = state.nutrition.settings;
   const tdee = tdeeFor(selectedDate);
@@ -1110,9 +1182,7 @@ function renderHero() {
   const targetIntake = tdee - deficitGoal;
   const balance = tdee + burned - intake;
   document.getElementById('hero-date').textContent = fmtFull(selectedDate);
-  const numEl = document.getElementById('hero-number');
-  numEl.textContent = (balance >= 0 ? '−' : '+') + Math.abs(balance) + ' kcal';
-  numEl.className = 'hero-number ' + (balance >= 0 ? 'pos' : 'neg');
+  animateHeroNumber(balance);
   document.getElementById('hero-sub').textContent = balance >= 0
     ? `Déficit de ${balance} kcal respecto a tu meta de mantenimiento`
     : `Superávit de ${Math.abs(balance)} kcal respecto a tu meta de mantenimiento`;
@@ -1150,9 +1220,10 @@ let expandedFoodIds = new Set();
 function renderFoods() {
   const d = dayData(selectedDate);
   const list = document.getElementById('foods-list');
-  if (!d.foods.length) { list.innerHTML = '<div class="empty">Todavía no cargaste comidas para este día.</div>'; return; }
+  if (!d.foods.length) { list.innerHTML = '<div class="empty">Este día está en blanco — sumá tu primera comida con foto, código de barras o a mano.</div>'; return; }
   list.innerHTML = d.foods.map(f => {
     const expanded = expandedFoodIds.has(f.id);
+    const photo = state.photos.foodPhotos && state.photos.foodPhotos[f.id];
     const macros = [
       f.protein != null ? `<span class="macro-chip macro-protein">P ${f.protein}g</span>` : '',
       f.carbs != null ? `<span class="macro-chip macro-carbs">C ${f.carbs}g</span>` : '',
@@ -1163,6 +1234,7 @@ function renderFoods() {
       <div class="entry" data-toggle-food="${f.id}" style="cursor:pointer;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span class="chevron ${expanded ? 'open' : ''}">›</span>
+          ${photo ? `<img src="${photo.image}" class="food-thumb">` : ''}
           <div>
             <div class="entry-name">${escapeHtml(f.name)}</div>
             ${f.source === 'photo' ? '<div class="entry-meta">Estimado por foto</div>' : ''}
@@ -1189,7 +1261,7 @@ let editingActivityId = null;
 function renderActivities() {
   const d = dayData(selectedDate);
   const list = document.getElementById('activities-list');
-  if (!d.activities.length) { list.innerHTML = '<div class="empty">Todavía no cargaste actividad para este día.</div>'; return; }
+  if (!d.activities.length) { list.innerHTML = '<div class="empty">Sin actividad registrada todavía — sumá un entrenamiento o una caminata.</div>'; return; }
   list.innerHTML = d.activities.map(a => {
     if (editingActivityId === a.id) {
       return `<div class="entry" style="flex-direction:column; align-items:stretch;">
@@ -1503,13 +1575,27 @@ function renderProgressPhotos() {
   const dates = Object.keys(state.photos.photos).sort().reverse();
   const empty = document.getElementById('photos-empty');
   const strip = document.getElementById('photos-strip');
-  if (!dates.length) { empty.style.display = 'block'; strip.innerHTML = ''; return; }
+  const compareBtn = document.getElementById('compare-photos-btn');
+  if (!dates.length) { empty.style.display = 'block'; strip.innerHTML = ''; compareBtn.style.display = 'none'; return; }
   empty.style.display = 'none';
   strip.innerHTML = dates.map(d => `
     <div style="flex-shrink:0; text-align:center; cursor:pointer;" data-open-photo="${d}">
       <img src="${state.photos.photos[d].image}" style="width:90px; height:120px; object-fit:cover; border-radius:8px; border:1px solid var(--card-border);">
       <div class="entry-meta" style="margin-top:4px;">${fmtLabel(d)}</div>
     </div>`).join('');
+  if (dates.length >= 2) {
+    compareBtn.style.display = 'inline-block';
+    const ascDates = [...dates].reverse();
+    const optionsHtml = ascDates.map(d => `<option value="${d}">${fmtLabel(d)}</option>`).join('');
+    const beforeSel = document.getElementById('compare-select-before');
+    const afterSel = document.getElementById('compare-select-after');
+    beforeSel.innerHTML = optionsHtml;
+    afterSel.innerHTML = optionsHtml;
+    beforeSel.value = ascDates[0];
+    afterSel.value = ascDates[ascDates.length - 1];
+  } else {
+    compareBtn.style.display = 'none';
+  }
   strip.querySelectorAll('[data-open-photo]').forEach(el => {
     el.onclick = () => openPhotoLightbox(el.dataset.openPhoto);
   });
@@ -1521,6 +1607,21 @@ function openPhotoLightbox(dateStr) {
   document.getElementById('photo-lightbox-img').src = p.image;
   document.getElementById('photo-lightbox-overlay').dataset.date = dateStr;
   document.getElementById('photo-lightbox-overlay').style.display = 'flex';
+}
+function updateCompareImages() {
+  const beforeD = document.getElementById('compare-select-before').value;
+  const afterD = document.getElementById('compare-select-after').value;
+  const beforeP = state.photos.photos[beforeD];
+  const afterP = state.photos.photos[afterD];
+  if (beforeP) document.getElementById('compare-img-before').src = beforeP.image;
+  if (afterP) document.getElementById('compare-img-after').src = afterP.image;
+}
+function openComparePhotos() {
+  updateCompareImages();
+  document.getElementById('compare-range').value = 50;
+  document.getElementById('compare-img-after').style.clipPath = 'inset(0 50% 0 0)';
+  document.getElementById('compare-divider').style.left = '50%';
+  document.getElementById('compare-photos-overlay').style.display = 'flex';
 }
 
 function renderSummariesHistory() {
@@ -1742,7 +1843,7 @@ function renderGymLog() {
   const entries = state.gym.logs[selectedDate] || [];
   const list = document.getElementById('gym-log-list');
   if (!entries.length) {
-    list.innerHTML = '<div class="empty">Todavía no cargaste ejercicios para este día.</div>';
+    list.innerHTML = '<div class="empty">Arrancá cargando el primer ejercicio de hoy.</div>';
     document.getElementById('gym-day-total').innerHTML = '';
     return;
   }
@@ -2357,6 +2458,7 @@ async function analyzePhoto(file) {
       reader.readAsDataURL(file);
     });
     const parsed = await callAiFunction({ action: 'foto', image: base64, mediaType: file.type || 'image/jpeg' });
+    parsed.thumbnail = await compressImageFile(file, 160).catch(() => null);
     currentPhotoSuggestion = parsed;
     document.getElementById('sugg-name').value = parsed.name || 'Comida sin nombre';
     document.getElementById('sugg-quantity').value = 1;
@@ -2619,7 +2721,7 @@ function renderDeporteLog() {
   const entries = state.gym.sportLogs[selectedDate] || [];
   const list = document.getElementById('deporte-log-list');
   if (!entries.length) {
-    list.innerHTML = '<div class="empty">Todavía no cargaste deporte para este día.</div>';
+    list.innerHTML = '<div class="empty">Sin sesiones de deporte hoy — sumá la primera.</div>';
     document.getElementById('deporte-day-total').innerHTML = '';
     return;
   }
@@ -2737,7 +2839,7 @@ function renderCarga() {
   const breakdown = document.getElementById('carga-breakdown');
   const sports = Object.keys(bySport);
   if (!sports.length) {
-    breakdown.innerHTML = '<div class="empty">Todavía no cargaste deporte esta semana.</div>';
+    breakdown.innerHTML = '<div class="empty">Sin carga de deporte esta semana todavía.</div>';
   } else {
     breakdown.innerHTML = sports.map(s => `
       <div class="entry"><div class="entry-name">${escapeHtml(s)}</div>
@@ -2946,6 +3048,17 @@ function wireEvents() {
     if (d) { delete state.photos.photos[d]; persistPhotos(); renderProgressPhotos(); }
     document.getElementById('photo-lightbox-overlay').style.display = 'none';
   };
+  document.getElementById('compare-photos-btn').onclick = openComparePhotos;
+  document.getElementById('compare-photos-close').onclick = () => {
+    document.getElementById('compare-photos-overlay').style.display = 'none';
+  };
+  document.getElementById('compare-select-before').onchange = updateCompareImages;
+  document.getElementById('compare-select-after').onchange = updateCompareImages;
+  document.getElementById('compare-range').oninput = (e) => {
+    const val = Number(e.target.value);
+    document.getElementById('compare-img-after').style.clipPath = `inset(0 ${100 - val}% 0 0)`;
+    document.getElementById('compare-divider').style.left = val + '%';
+  };
   document.getElementById('photo-input').onchange = (e) => {
     const file = e.target.files[0];
     if (file) analyzePhoto(file);
@@ -2958,7 +3071,7 @@ function wireEvents() {
     const protein = document.getElementById('sugg-protein').value;
     const carbs = document.getElementById('sugg-carbs').value;
     const fat = document.getElementById('sugg-fat').value;
-    addFood(selectedDate, {
+    const entry = addFood(selectedDate, {
       name: qty > 1 ? name + ' ×' + qty : name,
       calories: Math.round((Number(document.getElementById('sugg-cal').value) || 0) * qty),
       protein: protein === '' ? null : Math.round(Number(protein) * qty),
@@ -2967,6 +3080,11 @@ function wireEvents() {
       quantity: qty,
       source: 'photo'
     });
+    if (currentPhotoSuggestion && currentPhotoSuggestion.thumbnail) {
+      state.photos.foodPhotos[entry.id] = { image: currentPhotoSuggestion.thumbnail, savedAt: new Date().toISOString() };
+      persistPhotos();
+    }
+    currentPhotoSuggestion = null;
     document.getElementById('photo-suggestion').classList.remove('show');
     renderAll();
   };

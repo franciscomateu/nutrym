@@ -9,6 +9,11 @@
   schedule = "59 2 * * *"
 
 [[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
