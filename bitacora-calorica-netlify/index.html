@@ -70,7 +70,7 @@
   .hero-sub { font-size: 13px; color: #9BA3AA; margin-top: 10px; font-weight: 500; }
   .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 14px; row-gap: 16px; margin-top: 22px; border-top: 1px solid #262B2F; padding-top: 18px; }
   .stats > div:not(:nth-child(3n)) { border-right: 1px solid #262B2F; padding-right: 12px; }
-  .stats > div:nth-child(-n+3) { border-bottom: 1px solid #262B2F; padding-bottom: 16px; }
+  .stats > div:not(:nth-last-child(-n+3)) { border-bottom: 1px solid #262B2F; padding-bottom: 16px; }
   .stat-label { font-size: 11px; color: #8B939A; font-weight: 500; }
   .stat-value { font-size: 19px; font-weight: 800; margin-top: 4px; font-family: 'Manrope', sans-serif; color: var(--bg); font-variant-numeric: tabular-nums; }
 
@@ -175,10 +175,17 @@
 <div class="wrap">
 
   <div class="header">
-    <div>
-      <div class="title">Nutrym</div>
-      <div class="saving" id="saving-indicator">&nbsp;</div>
-      <div class="offline-badge" id="offline-badge">Sin conexión — guardando local</div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <input type="file" accept="image/*" style="display:none;" id="profile-photo-input">
+      <div id="profile-photo-circle" style="width:40px; height:40px; border-radius:50%; background:var(--accent-soft); flex-shrink:0; cursor:pointer; overflow:hidden; display:flex; align-items:center; justify-content:center; border:1px solid var(--card-border);">
+        <span id="profile-photo-placeholder" style="font-size:11px; color:var(--accent); font-weight:700;">+</span>
+        <img id="profile-photo-img" style="display:none; width:100%; height:100%; object-fit:cover;">
+      </div>
+      <div>
+        <div class="title">Nutrym</div>
+        <div class="saving" id="saving-indicator">&nbsp;</div>
+        <div class="offline-badge" id="offline-badge">Sin conexión — guardando local</div>
+      </div>
     </div>
     <div class="datewrap">
       <button class="datebtn" id="prev-day">‹</button>
@@ -206,13 +213,17 @@
       <div><div class="stat-label">Deporte</div><div class="stat-value" id="stat-deporte"></div></div>
       <div><div class="stat-label">Meta de ingesta</div><div class="stat-value" id="stat-target"></div></div>
       <div><div class="stat-label">Mantenimiento (TDEE)</div><div class="stat-value" id="stat-tdee"></div></div>
-      <div><div class="stat-label">Whoop</div><div class="stat-value" id="stat-whoop" style="font-size:13px;"></div></div>
+      <div><div class="stat-label">Recovery</div><div class="stat-value" id="stat-recovery" style="font-size:15px;"></div></div>
+      <div><div class="stat-label">Sueño</div><div class="stat-value" id="stat-sleep" style="font-size:15px;"></div></div>
+      <div><div class="stat-label">Pasos</div><div class="stat-value" id="stat-steps" style="font-size:15px;"></div></div>
+      <div><div class="stat-label">Peso</div><div class="stat-value" id="stat-weight" style="font-size:15px;"></div></div>
     </div>
   </div>
 
   <div class="tabs">
     <button class="tab active" data-tab="alimentacion">Alimentación</button>
     <button class="tab" data-tab="actividad">Actividad</button>
+    <button class="tab" data-tab="dispositivos">Dispositivos</button>
     <button class="tab" data-tab="nutria">NutrIA</button>
     <button class="tab" data-tab="historial">Historial</button>
     <button class="tab" data-tab="config">Configuración</button>
@@ -251,7 +262,14 @@
         <div class="suggestion-title">Sugerencia de la foto</div>
         <div class="suggestion-macros" id="suggestion-meta"></div>
         <div class="coach-note" id="suggestion-comment" style="display:none;"></div>
-        <div class="form-row" style="margin-top:0;">
+        <div class="hint" style="margin-top:0;">¿La porción real era más chica o más grande que lo que asumió la IA?</div>
+        <div class="form-row" style="margin-top:8px;">
+          <button type="button" class="btn secondary" data-portion-adjust="0.5">Bastante menos</button>
+          <button type="button" class="btn secondary" data-portion-adjust="0.75">Un poco menos</button>
+          <button type="button" class="btn secondary" data-portion-adjust="1.25">Un poco más</button>
+          <button type="button" class="btn secondary" data-portion-adjust="1.5">Bastante más</button>
+        </div>
+        <div class="form-row" style="margin-top:14px;">
           <div class="field grow"><label>Alimento</label><input type="text" id="sugg-name"></div>
           <div class="field small"><label>Cantidad</label><input type="number" min="1" step="1" id="sugg-quantity" value="1"></div>
           <div class="field small"><label>Kcal (x1)</label><input type="number" id="sugg-cal"></div>
@@ -269,6 +287,9 @@
     <div class="panel">
       <h3>Sugerencias para hoy</h3>
       <div class="hint" style="margin-top:0;">Mira cuánto te queda de tu meta diaria y sugiere opciones para completarla.</div>
+      <div class="form-row" style="margin-top:10px;">
+        <div class="field grow"><label>Basado en qué (opcional)</label><input type="text" id="suggest-ingredient" placeholder="Ej: pollo, carne, ensalada"></div>
+      </div>
       <button type="button" class="btn secondary" id="suggest-meals-btn" style="margin-top:10px;">Sugerir comidas</button>
       <div class="error-box" id="suggest-error"></div>
       <div id="suggest-results"></div>
@@ -280,6 +301,7 @@
     <div class="subtabs" id="actividad-outer-subtabs">
       <button class="subtab active" data-actividadtab="gimnasio">Gimnasio</button>
       <button class="subtab" data-actividadtab="deporte">Deporte</button>
+      <button class="subtab" data-actividadtab="otra">Otra</button>
     </div>
 
     <div id="actividad-gimnasio" class="actividadtabsection">
@@ -354,38 +376,11 @@
     </div>
 
     <div id="actividad-deporte" class="actividadtabsection" style="display:none;">
-      <div class="panel">
-        <h3>Otra actividad</h3>
-        <div class="hint" style="margin-top:0;">Para lo que no es ni gimnasio ni un deporte armado — caminata, pileta libre, etc.</div>
-        <div id="activities-list"></div>
-        <form id="activity-form">
-          <div class="form-row">
-            <div class="field grow"><label>Actividad</label><input type="text" id="act-name" placeholder="Ej: caminata, pileta libre"></div>
-            <div class="field small"><label>Kcal quemadas</label><input type="number" min="0" id="act-cal" placeholder="0"></div>
-            <div class="field small"><label>Min (opc.)</label><input type="number" min="0" id="act-duration"></div>
-            <button type="submit" class="btn">Agregar</button>
-          </div>
-        </form>
-        <div class="hint" id="act-cal-hint" style="margin-top:6px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Whoop — recovery y sueño</h3>
-        <div id="whoop-vitals-status"></div>
-        <button type="button" class="btn secondary" id="whoop-vitals-refresh-btn" style="margin-top:10px;">Actualizar</button>
-        <div class="error-box" id="whoop-vitals-error"></div>
-        <div id="whoop-vitals-content" style="margin-top:12px;"></div>
-      </div>
-
-      <div class="panel">
-        <h3>Apple Health</h3>
-        <div id="applehealth-content"></div>
-        <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — no hace falta que hagas nada acá.</div>
-      </div>
 
       <div class="subtabs">
         <button class="subtab active" data-deportetab="registrar">Registrar</button>
         <button class="subtab" data-deportetab="carga">Carga semanal</button>
+        <button class="subtab" data-deportetab="historial">Historial</button>
       </div>
 
       <div id="deporte-registrar" class="deportetabsection">
@@ -424,7 +419,9 @@
               <label>Nota (opcional)</label>
               <input type="text" id="deporte-note" placeholder="Ej: ganamos 6-3, sentí bien las piernas">
             </div>
-            <button type="submit" class="btn" style="margin-top:12px;">Guardar sesión</button>
+            <div id="deporte-stats-container" style="margin-top:10px;"></div>
+            <button type="button" class="linkbtn" id="add-deporte-stat">+ agregar estadística (ej: tries, conversiones)</button>
+            <button type="submit" class="btn" style="margin-top:12px; display:block;">Guardar sesión</button>
           </form>
         </div>
       </div>
@@ -439,6 +436,35 @@
             <div id="carga-breakdown"></div>
           </div>
         </div>
+      </div>
+
+      <div id="deporte-historial" class="deportetabsection" style="display:none;">
+        <div class="panel">
+          <h3>Historial por deporte</h3>
+          <div class="field grow" style="margin-bottom:14px;">
+            <label>Deporte</label>
+            <select id="deporte-history-select"><option value="">Elegí un deporte</option></select>
+          </div>
+          <div id="deporte-history-empty" class="empty">Elegí un deporte para ver tu historial de sesiones.</div>
+          <div id="deporte-history-content" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="actividad-otra" class="actividadtabsection" style="display:none;">
+      <div class="panel">
+        <h3>Otra actividad</h3>
+        <div class="hint" style="margin-top:0;">Para lo que no es ni gimnasio ni un deporte armado — caminata, pileta libre, etc.</div>
+        <div id="activities-list"></div>
+        <form id="activity-form">
+          <div class="form-row">
+            <div class="field grow"><label>Actividad</label><input type="text" id="act-name" placeholder="Ej: caminata, pileta libre"></div>
+            <div class="field small"><label>Kcal quemadas</label><input type="number" min="0" id="act-cal" placeholder="0"></div>
+            <div class="field small"><label>Min (opc.)</label><input type="number" min="0" id="act-duration"></div>
+            <button type="submit" class="btn">Agregar</button>
+          </div>
+        </form>
+        <div class="hint" id="act-cal-hint" style="margin-top:6px;"></div>
       </div>
     </div>
   </section>
@@ -511,6 +537,38 @@
     </div>
   </section>
 
+  <!-- DISPOSITIVOS -->
+  <section id="tab-dispositivos" class="tabsection" style="display:none;">
+    <div class="panel">
+      <h3>Whoop</h3>
+      <div id="whoop-status"></div>
+      <button class="btn" id="whoop-connect-btn" style="margin-top:10px;">Conectar con Whoop</button>
+      <button class="btn secondary" id="whoop-sync-btn" style="margin-top:10px; display:none;">Sincronizar entrenamientos</button>
+      <button class="linkbtn" id="whoop-disconnect-btn" style="margin-top:12px; display:none;">Desconectar</button>
+      <div class="error-box" id="whoop-error"></div>
+      <div class="hint">Trae tus entrenamientos registrados por el Whoop y los suma como actividad del día correspondiente, para el cálculo de déficit.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Whoop — recovery y sueño de hoy</h3>
+      <div id="whoop-vitals-status"></div>
+      <button type="button" class="btn secondary" id="whoop-vitals-refresh-btn" style="margin-top:10px;">Actualizar</button>
+      <div class="error-box" id="whoop-vitals-error"></div>
+      <div id="whoop-vitals-content" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Apple Health</h3>
+      <div id="applehealth-content"></div>
+      <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — no hace falta que hagas nada acá.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Otras conexiones</h3>
+      <div class="empty">Por ahora solo Whoop y Apple Health. Cuando conectemos algo más, va a aparecer acá.</div>
+    </div>
+  </section>
+
   <!-- NUTRIA -->
   <section id="tab-nutria" class="tabsection" style="display:none;">
     <div class="panel">
@@ -550,16 +608,6 @@
       <div class="field"><label>Altura (cm)</label><input type="number" min="0" id="cfg-height"></div>
       <button class="btn" id="save-height" style="margin-top:12px;">Guardar</button>
       <div class="hint">Se usa para estimar tu % de grasa corporal con la fórmula de la Marina de EE.UU. a partir de cuello y cintura.</div>
-    </div>
-
-    <div class="panel">
-      <h3>Whoop</h3>
-      <div id="whoop-status"></div>
-      <button class="btn" id="whoop-connect-btn" style="margin-top:10px;">Conectar con Whoop</button>
-      <button class="btn secondary" id="whoop-sync-btn" style="margin-top:10px; display:none;">Sincronizar entrenamientos</button>
-      <button class="linkbtn" id="whoop-disconnect-btn" style="margin-top:12px; display:none;">Desconectar</button>
-      <div class="error-box" id="whoop-error"></div>
-      <div class="hint">Trae tus entrenamientos registrados por el Whoop y los suma como actividad del día correspondiente, para el cálculo de déficit.</div>
     </div>
 
     <div class="panel">
@@ -1038,9 +1086,15 @@ function renderHero() {
   document.getElementById('stat-deporte').textContent = deporteBurned + ' kcal';
   document.getElementById('stat-target').textContent = targetIntake + ' kcal';
   document.getElementById('stat-tdee').textContent = tdee + ' kcal';
-  const whoopEl = document.getElementById('stat-whoop');
-  whoopEl.textContent = state.gym.whoop ? 'Conectado' : 'No conectado';
-  whoopEl.style.color = state.gym.whoop ? '#4FBE8B' : '';
+
+  const v = state.gym.whoopVitals;
+  document.getElementById('stat-recovery').textContent = (state.gym.whoop && v && v.recoveryScore != null) ? v.recoveryScore + '%' : (state.gym.whoop ? '—' : 'No conectado');
+  document.getElementById('stat-sleep').textContent = (state.gym.whoop && v && v.sleepHours != null) ? v.sleepHours + 'hs' : (state.gym.whoop ? '—' : 'No conectado');
+  const ah = (state.nutrition.appleHealth || {})[selectedDate];
+  document.getElementById('stat-steps').textContent = (ah && ah.steps != null) ? ah.steps.toLocaleString('es-AR') : '—';
+  const wdates = Object.keys(state.nutrition.weights).sort();
+  document.getElementById('stat-weight').textContent = wdates.length ? state.nutrition.weights[wdates[wdates.length - 1]] + 'kg' : '—';
+
   document.getElementById('date-input').value = selectedDate;
   document.getElementById('daytype-select').value = dayTypeFor(selectedDate);
   const streak = computeStreak();
@@ -1077,21 +1131,54 @@ function renderFoods() {
       </div>
     </div>`).join('');
 }
+let editingActivityId = null;
 function renderActivities() {
   const d = dayData(selectedDate);
   const list = document.getElementById('activities-list');
   if (!d.activities.length) { list.innerHTML = '<div class="empty">Todavía no cargaste actividad para este día.</div>'; return; }
-  list.innerHTML = d.activities.map(a => `
+  list.innerHTML = d.activities.map(a => {
+    if (editingActivityId === a.id) {
+      return `<div class="entry" style="flex-direction:column; align-items:stretch;">
+        <div class="field grow"><label>Nombre</label><input type="text" id="edit-act-name" value="${escapeHtml(a.name)}"></div>
+        <div class="field grow" style="margin-top:8px;"><label>Nota / resultado / highlights</label><input type="text" id="edit-act-note" value="${escapeHtml(a.note || '')}" placeholder="Ej: ganamos 6-3"></div>
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button class="btn" data-save-activity="${a.id}">Guardar</button>
+          <button class="btn secondary" data-cancel-activity="1">Cancelar</button>
+        </div>
+      </div>`;
+    }
+    return `
     <div class="entry">
       <div>
-        <div class="entry-name">${escapeHtml(a.name)}</div>
+        <div class="entry-name" data-edit-activity="${a.id}" style="cursor:pointer;">${escapeHtml(a.name)}</div>
         ${a.duration != null ? `<div class="entry-meta">${a.duration} min</div>` : ''}
+        ${a.note ? `<div class="entry-meta">${escapeHtml(a.note)}</div>` : ''}
       </div>
       <div class="entry-right">
         <div class="entry-cal">${a.calories} kcal</div>
         <button class="del" data-remove-activity="${a.id}">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-edit-activity]').forEach(el => {
+    el.onclick = () => { editingActivityId = el.dataset.editActivity; renderActivities(); };
+  });
+  list.querySelectorAll('[data-cancel-activity]').forEach(el => {
+    el.onclick = () => { editingActivityId = null; renderActivities(); };
+  });
+  list.querySelectorAll('[data-save-activity]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.saveActivity;
+      const newName = document.getElementById('edit-act-name').value.trim();
+      const newNote = document.getElementById('edit-act-note').value.trim();
+      const dd = ensureDay(selectedDate);
+      const entry = dd.activities.find(x => x.id === id);
+      if (entry && newName) { entry.name = newName; entry.note = newNote || null; }
+      editingActivityId = null;
+      persistNutrition();
+      renderActivities();
+    };
+  });
 }
 function renderBodyCompToday() {
   const view = document.getElementById('bodycomp-today-view');
@@ -1249,6 +1336,29 @@ function showSummaryModal(dateStr, summary) {
   document.getElementById('summary-modal-overlay').style.display = 'flex';
 }
 /* ====================== FOTOS DE PROGRESO ====================== */
+function renderProfilePhoto() {
+  const img = document.getElementById('profile-photo-img');
+  const placeholder = document.getElementById('profile-photo-placeholder');
+  const photo = state.nutrition.settings.profilePhoto;
+  if (photo) {
+    img.src = photo; img.style.display = 'block'; placeholder.style.display = 'none';
+  } else {
+    img.style.display = 'none'; placeholder.style.display = 'block';
+  }
+}
+async function handleProfilePhotoSelected(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    const dataUrl = await compressImageFile(file, 200);
+    state.nutrition.settings = { ...state.nutrition.settings, profilePhoto: dataUrl };
+    await persistNutrition();
+    renderProfilePhoto();
+  } catch (err) {
+    showGlobalError('No se pudo guardar la foto de perfil.');
+  }
+  document.getElementById('profile-photo-input').value = '';
+}
 function compressImageFile(file, maxWidth) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -1621,6 +1731,7 @@ function renderAll() {
   renderDeporteLog();
   renderCarga();
   renderConfig();
+  renderProfilePhoto();
   renderWhoopStatus();
   renderWhoopVitalsStatus();
   renderAppleHealth();
@@ -1831,7 +1942,7 @@ function renderWhoopVitalsStatus() {
   const refreshBtn = document.getElementById('whoop-vitals-refresh-btn');
   const contentBox = document.getElementById('whoop-vitals-content');
   if (!state.gym.whoop) {
-    statusBox.innerHTML = '<div class="entry-meta">Conectá Whoop en Configuración para ver esto.</div>';
+    statusBox.innerHTML = '<div class="entry-meta">Conectá Whoop arriba para ver esto.</div>';
     refreshBtn.style.display = 'none';
     contentBox.innerHTML = '';
     return;
@@ -1840,10 +1951,17 @@ function renderWhoopVitalsStatus() {
   refreshBtn.style.display = 'inline-block';
   const v = state.gym.whoopVitals;
   if (v) {
-    contentBox.innerHTML = `
-      ${v.recoveryScore != null ? `<span class="mock-badge" style="display:inline-block; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px; margin-right:8px;">Recovery: ${v.recoveryScore}%</span>` : ''}
-      ${v.sleepHours != null ? `<span class="mock-badge" style="display:inline-block; background:var(--slate-soft); color:var(--slate); font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px;">Dormiste ${v.sleepHours}hs${v.sleepPerformance != null ? ' · ' + v.sleepPerformance + '% performance' : ''}</span>` : ''}
-      <div class="hint">Actualizado ${fmtLabel(v.fetchedAt.slice(0, 10))}.</div>`;
+    const rows = [
+      ['Recovery', v.recoveryScore != null ? v.recoveryScore + '%' : null],
+      ['FC en reposo', v.restingHeartRate != null ? v.restingHeartRate + ' bpm' : null],
+      ['HRV', v.hrvMs != null ? v.hrvMs + ' ms' : null],
+      ['Horas dormidas', v.sleepHours != null ? v.sleepHours + 'hs' : null],
+      ['Sleep performance', v.sleepPerformance != null ? v.sleepPerformance + '%' : null],
+      ['Eficiencia del sueño', v.sleepEfficiency != null ? v.sleepEfficiency + '%' : null],
+      ['Frecuencia respiratoria', v.respiratoryRate != null ? v.respiratoryRate + ' rpm' : null]
+    ].filter(r => r[1] != null);
+    contentBox.innerHTML = rows.map(r => `<div class="entry"><div class="entry-name">${r[0]}</div><div class="entry-cal">${r[1]}</div></div>`).join('')
+      + `<div class="hint" style="margin-top:8px;">Actualizado ${fmtLabel(v.fetchedAt.slice(0, 10))}.</div>`;
   } else {
     contentBox.innerHTML = '<div class="empty">Todavía no se trajeron datos — tocá "Actualizar".</div>';
   }
@@ -1857,12 +1975,17 @@ async function whoopFetchVitals() {
     const token = await whoopEnsureValidToken();
     if (!token) throw new Error('no conectado');
     const data = await callWhoopFunction({ action: 'vitals', accessToken: token });
+    const rec = data.recovery && data.recovery.score;
+    const sl = data.sleep && data.sleep.score;
     state.gym.whoopVitals = {
-      recoveryScore: data.recovery && data.recovery.score ? Math.round(data.recovery.score.recovery_score) : null,
-      sleepHours: data.sleep && data.sleep.score && data.sleep.score.stage_summary
-        ? Math.round((data.sleep.score.stage_summary.total_in_bed_time_milli / 3600000) * 10) / 10 : null,
-      sleepPerformance: data.sleep && data.sleep.score && data.sleep.score.sleep_performance_percentage != null
-        ? Math.round(data.sleep.score.sleep_performance_percentage) : null,
+      recoveryScore: rec && rec.recovery_score != null ? Math.round(rec.recovery_score) : null,
+      restingHeartRate: rec && rec.resting_heart_rate != null ? Math.round(rec.resting_heart_rate) : null,
+      hrvMs: rec && rec.hrv_rmssd_milli != null ? Math.round(rec.hrv_rmssd_milli) : null,
+      sleepHours: sl && sl.stage_summary && sl.stage_summary.total_in_bed_time_milli != null
+        ? Math.round((sl.stage_summary.total_in_bed_time_milli / 3600000) * 10) / 10 : null,
+      sleepPerformance: sl && sl.sleep_performance_percentage != null ? Math.round(sl.sleep_performance_percentage) : null,
+      sleepEfficiency: sl && sl.sleep_efficiency_percentage != null ? Math.round(sl.sleep_efficiency_percentage) : null,
+      respiratoryRate: sl && sl.respiratory_rate != null ? Math.round(sl.respiratory_rate * 10) / 10 : null,
       fetchedAt: new Date().toISOString()
     };
     await persistGym();
@@ -2101,9 +2224,10 @@ async function suggestMeals() {
   const targetIntake = tdeeFor(selectedDate) - state.nutrition.settings.deficitGoal;
   const remainingKcal = targetIntake - intake;
   const foodsToday = (dayData(selectedDate).foods || []).map(f => f.name);
+  const ingredient = document.getElementById('suggest-ingredient').value.trim();
   try {
     const parsed = await callAiFunction({
-      action: 'sugerencias', remainingKcal, targetIntake, foodsToday
+      action: 'sugerencias', remainingKcal, targetIntake, foodsToday, ingredient
     });
     const options = parsed.options || [];
     results.innerHTML = `
@@ -2282,6 +2406,7 @@ function renderDeporteLog() {
         <div class="entry-name">${escapeHtml(en.sport)}</div>
         <div class="entry-meta">${en.durationMin} min · RPE ${en.rpe} · carga ${en.durationMin * en.rpe}</div>
         ${en.note ? `<div class="entry-meta">${escapeHtml(en.note)}</div>` : ''}
+        ${en.customStats && en.customStats.length ? `<div class="entry-meta">${en.customStats.map(s => escapeHtml(s.label) + ': ' + escapeHtml(s.value)).join(' · ')}</div>` : ''}
         <div class="entry-meta">${en.caloriesBurned != null ? `≈${en.caloriesBurned} kcal quemadas` : 'estimando kcal…'}</div>
       </div>
       <button class="del" data-remove-deporte="${en.id}">✕</button>
@@ -2306,6 +2431,55 @@ function renderDeporteLog() {
   entries.forEach(en => {
     if (en.caloriesBurned == null) estimateSportEntryCalories(selectedDate, en.id);
   });
+}
+function renderDeporteHistorySelect() {
+  const sel = document.getElementById('deporte-history-select');
+  const current = sel.value;
+  const sports = sportNameOptions();
+  sel.innerHTML = '<option value="">Elegí un deporte</option>' + sports.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if (sports.includes(current)) sel.value = current;
+  renderDeporteHistory();
+}
+function renderDeporteHistory() {
+  const sport = document.getElementById('deporte-history-select').value;
+  const empty = document.getElementById('deporte-history-empty');
+  const content = document.getElementById('deporte-history-content');
+  if (!sport) { empty.style.display = 'block'; content.style.display = 'none'; return; }
+
+  const sessions = [];
+  Object.keys(state.gym.sportLogs).sort().reverse().forEach(d => {
+    state.gym.sportLogs[d].forEach(en => {
+      if (en.sport.toLowerCase() === sport.toLowerCase()) sessions.push({ date: d, ...en });
+    });
+  });
+  if (!sessions.length) { empty.style.display = 'block'; content.style.display = 'none'; return; }
+  empty.style.display = 'none'; content.style.display = 'block';
+
+  // promedios simples para estadísticas numéricas que se repiten
+  const numericTotals = {};
+  sessions.forEach(s => (s.customStats || []).forEach(st => {
+    const num = Number(st.value);
+    if (!isNaN(num) && st.value.trim() !== '') {
+      if (!numericTotals[st.label]) numericTotals[st.label] = { sum: 0, count: 0 };
+      numericTotals[st.label].sum += num;
+      numericTotals[st.label].count++;
+    }
+  }));
+  const avgLines = Object.entries(numericTotals).map(([label, v]) =>
+    `<span style="margin-right:14px;">${escapeHtml(label)}: promedio ${Math.round((v.sum / v.count) * 10) / 10}</span>`).join('');
+
+  content.innerHTML = `
+    <div class="avg-badge">${sessions.length} sesiones registradas</div>
+    ${avgLines ? `<div class="hint" style="margin-bottom:14px;">${avgLines}</div>` : ''}
+    ${sessions.map(s => `
+      <div class="entry" style="align-items:flex-start;">
+        <div>
+          <div class="entry-name">${fmtLabel(s.date)}</div>
+          <div class="entry-meta">${s.durationMin} min · RPE ${s.rpe}</div>
+          ${s.note ? `<div class="entry-meta">${escapeHtml(s.note)}</div>` : ''}
+          ${s.customStats && s.customStats.length ? `<div class="entry-meta">${s.customStats.map(st => escapeHtml(st.label) + ': ' + escapeHtml(st.value)).join(' · ')}</div>` : ''}
+        </div>
+      </div>`).join('')}`;
 }
 function renderCarga() {
   const emptyEl = document.getElementById('carga-empty');
@@ -2365,6 +2539,9 @@ function wireEvents() {
       if (activeTab === 'actividad') {
         renderGymLog(); renderRoutine(); renderProgress();
         renderDeporteDatalist(); renderDeporteLog(); renderCarga();
+      }
+      if (activeTab === 'dispositivos') {
+        renderWhoopStatus();
         renderWhoopVitalsStatus();
         renderAppleHealth();
       }
@@ -2394,6 +2571,7 @@ function wireEvents() {
       document.querySelectorAll('.deportetabsection').forEach(s => s.style.display = 'none');
       document.getElementById('deporte-' + target).style.display = 'block';
       if (target === 'carga') renderCarga();
+      if (target === 'historial') renderDeporteHistorySelect();
     };
   });
 
@@ -2506,16 +2684,22 @@ function wireEvents() {
     const sport = document.getElementById('deporte-name').value.trim();
     const duration = document.getElementById('deporte-duration').value;
     if (!sport || duration === '') return;
+    const customStats = Array.from(document.querySelectorAll('#deporte-stats-container .setrow')).map(row => ({
+      label: row.querySelector('.deporte-stat-label').value.trim(),
+      value: row.querySelector('.deporte-stat-value').value.trim()
+    })).filter(s => s.label && s.value);
     if (!state.gym.sportLogs[selectedDate]) state.gym.sportLogs[selectedDate] = [];
     state.gym.sportLogs[selectedDate].push({
       id: uid(), sport, durationMin: Math.round(Number(duration)) || 0,
       rpe: Number(document.getElementById('deporte-rpe').value) || 5,
       note: document.getElementById('deporte-note').value.trim(),
+      customStats,
       time: new Date().toISOString()
     });
     persistGym();
     e.target.reset();
     document.getElementById('deporte-rpe').value = '7';
+    document.getElementById('deporte-stats-container').innerHTML = '';
     renderDeporteLog(); renderDeporteDatalist();
   };
 
@@ -2529,6 +2713,8 @@ function wireEvents() {
   document.getElementById('barcode-confirm').onclick = confirmBarcodeProduct;
   document.getElementById('progress-photo-btn').onclick = () => document.getElementById('progress-photo-input').click();
   document.getElementById('progress-photo-input').addEventListener('change', handleProgressPhotoSelected);
+  document.getElementById('profile-photo-circle').onclick = () => document.getElementById('profile-photo-input').click();
+  document.getElementById('profile-photo-input').addEventListener('change', handleProfilePhotoSelected);
   document.getElementById('photo-lightbox-close').onclick = () => {
     document.getElementById('photo-lightbox-overlay').style.display = 'none';
   };
@@ -2542,6 +2728,15 @@ function wireEvents() {
     if (file) analyzePhoto(file);
   };
   document.getElementById('sugg-discard').onclick = () => document.getElementById('photo-suggestion').classList.remove('show');
+  document.querySelectorAll('[data-portion-adjust]').forEach(btn => {
+    btn.onclick = () => {
+      const factor = Number(btn.dataset.portionAdjust);
+      ['sugg-cal', 'sugg-protein', 'sugg-carbs', 'sugg-fat'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el.value !== '') el.value = Math.round(Number(el.value) * factor);
+      });
+    };
+  });
   document.getElementById('suggest-meals-btn').onclick = suggestMeals;
   document.getElementById('sugg-confirm').onclick = () => {
     const qty = Math.max(1, Math.round(Number(document.getElementById('sugg-quantity').value)) || 1);
@@ -2564,6 +2759,8 @@ function wireEvents() {
 
   addSetRow();
   document.getElementById('add-set').onclick = addSetRow;
+  document.getElementById('add-deporte-stat').onclick = addDeporteStatRow;
+  document.getElementById('deporte-history-select').addEventListener('change', renderDeporteHistory);
   document.getElementById('gym-form').onsubmit = (e) => {
     e.preventDefault();
     const name = document.getElementById('gym-exercise-name').value.trim();
@@ -2642,6 +2839,16 @@ function wireEvents() {
   document.getElementById('summary-modal-close').onclick = () => {
     document.getElementById('summary-modal-overlay').style.display = 'none';
   };
+}
+function addDeporteStatRow() {
+  const container = document.getElementById('deporte-stats-container');
+  const row = document.createElement('div');
+  row.className = 'setrow';
+  row.innerHTML = `<input type="text" placeholder="ej: tries" class="deporte-stat-label" style="width:110px;">
+    <input type="text" placeholder="ej: 1" class="deporte-stat-value" style="width:80px;">
+    <button type="button" class="del remove-deporte-stat">✕</button>`;
+  row.querySelector('.remove-deporte-stat').onclick = () => row.remove();
+  container.appendChild(row);
 }
 function addSetRow() {
   const container = document.getElementById('sets-container');

@@ -61,6 +61,7 @@ exports.handler = async (event) => {
     const restantes = payload.remainingKcal;
     const comidas = (payload.foodsToday && payload.foodsToday.length) ? payload.foodsToday.join(', ') : 'nada todavía';
     const prompt = 'Sos un nutricionista argentino. A esta persona le quedan aproximadamente ' + restantes + ' kcal para llegar a su meta diaria de ' + payload.targetIntake + ' kcal (ya comió hoy: ' + comidas + '). '
+      + (payload.ingredient ? 'Quiere específicamente opciones basadas en: "' + payload.ingredient + '". Las 3 opciones tienen que usar ese ingrediente como base. ' : '')
       + 'Sugerí 3 opciones de comida o colación realistas, variadas, de cocina cotidiana argentina, que se acerquen a esa cantidad de calorías sin pasarse mucho, priorizando buena cantidad de proteína ya que está en déficit calórico. '
       + 'Si el valor de kcal restantes es muy bajo (menos de 150) o negativo, aclarálo en la nota y sugerí opciones livianas o directamente decí que ya cumplió el objetivo del día. '
       + 'Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"note": "frase corta de contexto", "options": [{"name": "nombre del plato", "calories": numero_entero, "protein_g": numero, "reason": "una frase corta de por qué la sugerís"}]}. Devolvé exactamente 3 opciones. Respondé SOLO el JSON.';

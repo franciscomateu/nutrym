@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bitacora-shell-v9';
+const CACHE_NAME = 'bitacora-shell-v10';
 const SHELL_FILES = [
   '/',
   '/index.html',
