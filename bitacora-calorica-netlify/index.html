@@ -848,12 +848,30 @@ function showGlobalError(msg) {
 
 /* ====================== PERSISTENCIA: JSONBin + cache local + cola offline ====================== */
 async function jsonbinGet(binId) {
-  const res = await fetch(JSONBIN_BASE + binId + '/latest', {
-    headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-  });
-  if (!res.ok) throw new Error('jsonbin get ' + res.status);
+  let res;
+  try {
+    res = await fetch(JSONBIN_BASE + binId + '/latest', {
+      headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
+    });
+  } catch (networkErr) {
+    const err = new Error('No se pudo contactar a JSONBin: ' + networkErr.message);
+    err.networkFailure = true;
+    throw err;
+  }
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch (e) {}
+    const err = new Error('jsonbin get ' + res.status + (detail ? ': ' + detail : ''));
+    err.status = res.status;
+    throw err;
+  }
   const data = await res.json();
   return data.record;
+}
+function syncMessageFor(e) {
+  if (e && e.networkFailure) return 'No se pudo conectar con el servidor — guardando local';
+  if (e && (e.status === 403 || e.status === 429)) return 'Límite diario de JSONBin alcanzado';
+  return 'No se pudo guardar — reintenta solo';
 }
 async function jsonbinPut(binId, record) {
   let res;
@@ -906,17 +924,8 @@ async function persistDomain(domain, binId, record) {
     markPending(domain, false);
     setSaving('');
   } catch (e) {
-    let message;
-    if (e.networkFailure) {
-      message = 'No se pudo conectar con el servidor — guardando local';
-      console.warn('Fetch falló al intentar guardar (posible problema real de red o DNS):', e.message);
-    } else if (e.status === 403 || e.status === 429) {
-      message = 'Límite diario de JSONBin alcanzado';
-      console.warn('JSONBin rechazó el guardado (probable límite de cuota):', e.message);
-    } else {
-      message = 'No se pudo guardar — reintenta solo';
-      console.warn('Error al guardar en JSONBin:', e.message);
-    }
+    const message = syncMessageFor(e);
+    console.warn('Error al guardar en JSONBin:', e.message);
     markPending(domain, true, message);
     setSaving(message);
   }
@@ -954,7 +963,7 @@ async function loadAll() {
     saveLocalCache('nutrition', state.nutrition);
   } catch (e) {
     const cached = loadLocalCache('nutrition');
-    if (cached) { state.nutrition = cached; markPending('nutrition', true); }
+    if (cached) { state.nutrition = cached; markPending('nutrition', true, syncMessageFor(e)); console.warn('Error al cargar nutrición desde JSONBin:', e.message); }
   }
   if (!state.nutrition.settings) state.nutrition.settings = DEFAULT_SETTINGS;
   // migración: si venía del esquema viejo de un solo TDEE
@@ -986,7 +995,7 @@ async function loadAll() {
     saveLocalCache('gym', state.gym);
   } catch (e) {
     const cached = loadLocalCache('gym');
-    if (cached) { state.gym = cached; markPending('gym', true); }
+    if (cached) { state.gym = cached; markPending('gym', true, syncMessageFor(e)); console.warn('Error al cargar gym desde JSONBin:', e.message); }
   }
   if (!state.gym.exercises || !state.gym.exercises.length) state.gym.exercises = DEFAULT_EXERCISES;
   if (!state.gym.logs) state.gym.logs = {};
@@ -1011,7 +1020,7 @@ async function loadAll() {
     saveLocalCache('photos', state.photos);
   } catch (e) {
     const cached = loadLocalCache('photos');
-    if (cached) { state.photos = cached; markPending('photos', true); }
+    if (cached) { state.photos = cached; markPending('photos', true, syncMessageFor(e)); console.warn('Error al cargar fotos desde JSONBin:', e.message); }
   }
   if (!state.photos.photos) state.photos.photos = {};
   if (!state.photos.foodPhotos) state.photos.foodPhotos = {};
