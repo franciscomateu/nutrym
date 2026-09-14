@@ -834,7 +834,11 @@ function getMonday(dateStr) {
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function setSaving(msg) { document.getElementById('saving-indicator').textContent = msg || '\u00A0'; }
-function showOffline(show) { document.getElementById('offline-badge').classList.toggle('show', !!show); }
+function showOffline(show, message) {
+  const el = document.getElementById('offline-badge');
+  if (message) el.textContent = message;
+  el.classList.toggle('show', !!show);
+}
 function showGlobalError(msg) {
   const box = document.getElementById('global-error');
   if (!msg) { box.classList.remove('show'); return; }
@@ -857,7 +861,13 @@ async function jsonbinPut(binId, record) {
     headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_MASTER_KEY },
     body: JSON.stringify(record)
   });
-  if (!res.ok) throw new Error('jsonbin put ' + res.status);
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch (e) {}
+    const err = new Error('jsonbin put ' + res.status + (detail ? ': ' + detail : ''));
+    err.status = res.status;
+    throw err;
+  }
   return true;
 }
 
@@ -872,13 +882,13 @@ function loadLocalCache(domain) {
     return raw ? JSON.parse(raw) : null;
   } catch (e) { return null; }
 }
-function markPending(domain, isPending) {
+function markPending(domain, isPending, message) {
   pendingSync[domain] = isPending;
   try {
     if (isPending) localStorage.setItem(pendingKey(domain), '1');
     else localStorage.removeItem(pendingKey(domain));
   } catch (e) {}
-  showOffline(pendingSync.nutrition || pendingSync.gym || pendingSync.photos);
+  showOffline(pendingSync.nutrition || pendingSync.gym || pendingSync.photos, message);
 }
 
 async function persistDomain(domain, binId, record) {
@@ -889,8 +899,18 @@ async function persistDomain(domain, binId, record) {
     markPending(domain, false);
     setSaving('');
   } catch (e) {
-    markPending(domain, true);
-    setSaving('Sin conexión — se sincroniza solo');
+    let message;
+    if (!navigator.onLine) {
+      message = 'Sin conexión — guardando local';
+    } else if (e.status === 403 || e.status === 429) {
+      message = 'Límite diario de JSONBin alcanzado';
+      console.warn('JSONBin rechazó el guardado (probable límite de cuota):', e.message);
+    } else {
+      message = 'No se pudo guardar — reintenta solo';
+      console.warn('Error al guardar en JSONBin:', e.message);
+    }
+    markPending(domain, true, message);
+    setSaving(message);
   }
 }
 async function persistNutrition() { await persistDomain('nutrition', NUTRITION_BIN_ID, state.nutrition); }
