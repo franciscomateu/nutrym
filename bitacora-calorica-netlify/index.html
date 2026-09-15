@@ -94,13 +94,14 @@
   .tab.active { color: var(--accent); background: var(--accent-soft); }
   .tab.active { color: #fff; background: var(--accent); }
   .subtabs {
-    display: flex; gap: 4px;
+    display: flex; gap: 4px; flex-wrap: wrap;
     background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
     padding: 6px; margin-bottom: 14px;
     box-shadow: 0 1px 2px rgba(20,24,28,0.04);
   }
   .subtab { background: none; border: none; border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft); font-family: 'Manrope', sans-serif; }
   .subtab.active { color: #fff; background: var(--slate); }
+  #add-sport-btn { padding: 8px 14px; color: var(--accent); font-size: 15px; }
 
   .panel {
     background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
@@ -136,6 +137,9 @@
   .club-result-row:hover { background: var(--bg); }
   .club-result-badge { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
   .club-result-badge-fallback { width: 26px; height: 26px; border-radius: 50%; background: var(--card-border); flex-shrink: 0; }
+  .match-card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(20,24,28,0.04); }
+  .match-card .entry { border-bottom: none; padding: 0; }
+  .match-card .entry-detail { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
   .entry-name { font-weight: 700; }
   .entry-meta { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -451,12 +455,7 @@
 
   <!-- DEPORTES -->
   <section id="tab-deportes" class="tabsection" style="display:none;">
-    <div class="subtabs" id="sports-subtabs">
-      <button class="subtab active" data-sportkey="rugby">Rugby</button>
-      <button class="subtab" data-sportkey="futbol">Fútbol</button>
-      <button class="subtab" data-sportkey="padel">Pádel</button>
-      <button class="subtab" data-sportkey="actividad">Actividad</button>
-    </div>
+    <div class="subtabs" id="sports-subtabs"></div>
     <div id="sports-content"></div>
     <div id="sports-actividad-content" style="display:none;">
       <div id="actividad-deporte" class="actividadtabsection">
@@ -865,6 +864,15 @@
   </div>
 </div>
 
+<div id="add-sport-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">Agregar deporte</div>
+    <div id="add-sport-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+    <div class="empty" id="add-sport-empty" style="display:none;">Ya agregaste todos los deportes disponibles.</div>
+    <div style="margin-top:14px;"><button class="btn" id="add-sport-close">Cerrar</button></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 /* ====================== CONFIG ====================== */
@@ -918,7 +926,7 @@ let state = {
   nutrition: { settings: DEFAULT_SETTINGS, days: {} },
   gym: { exercises: DEFAULT_EXERCISES, logs: {}, currentRoutine: null, routineHistory: [], sportLogs: {}, whoop: null, pushSubscription: null },
   photos: { photos: {} },
-  sports: { profiles: {}, trainings: {}, matches: {}, badges: [] }
+  sports: { profiles: {}, trainings: {}, matches: {}, badges: [], enabledSports: ['rugby', 'futbol', 'padel'] }
 };
 let selectedDate = todayStr();
 let activeTab = 'alimentacion';
@@ -1189,6 +1197,7 @@ async function loadAll() {
   if (!state.sports.trainings) state.sports.trainings = {};
   if (!state.sports.matches) state.sports.matches = {};
   if (!state.sports.badges) state.sports.badges = [];
+  if (!state.sports.enabledSports) state.sports.enabledSports = ['rugby', 'futbol', 'padel'];
 }
 
 /* ====================== NUTRICIÓN: helpers de datos ====================== */
@@ -3119,23 +3128,10 @@ function renderCarga() {
 
 /* ====================== EVENTOS ====================== */
 function wireEvents() {
-  document.querySelectorAll('#sports-subtabs .subtab').forEach(btn => {
-    btn.onclick = () => {
-      currentSportKey = btn.dataset.sportkey;
-      editingMatchId = null;
-      editingTrainingId = null;
-      document.querySelectorAll('#sports-subtabs .subtab').forEach(b => b.classList.toggle('active', b === btn));
-      if (currentSportKey === 'actividad') {
-        document.getElementById('sports-content').style.display = 'none';
-        document.getElementById('sports-actividad-content').style.display = 'block';
-      } else {
-        document.getElementById('sports-actividad-content').style.display = 'none';
-        document.getElementById('sports-content').style.display = 'block';
-        renderSportSection();
-      }
-      updateHeroVisibility();
-    };
-  });
+  renderSportsSubtabs();
+  document.getElementById('add-sport-close').onclick = () => {
+    document.getElementById('add-sport-overlay').style.display = 'none';
+  };
   wireClubSearch('wizard-club-search', 'wizard-club-results', (team) => {
     wizardSelectedClub = { name: team.name, badgeUrl: team.badgeUrl };
     document.getElementById('wizard-club-selected').textContent = 'Elegiste: ' + team.name;
@@ -3668,6 +3664,8 @@ const SPORT_TEMPLATES = {
     label: 'Rugby',
     hasTrainings: true,
     hasProfileClub: true,
+    teamSport: true,
+    fieldType: 'grass',
     positions: ['Pilar', 'Hooker', '2ª línea', 'Ala', 'Octavo', 'Medio scrum', 'Apertura', 'Centro', 'Wing', 'Fullback'],
     matchStats: [
       { key: 'puntos', label: 'Puntos', type: 'number' },
@@ -3680,8 +3678,9 @@ const SPORT_TEMPLATES = {
     label: 'Fútbol',
     hasTrainings: true,
     hasProfileClub: false,
+    teamSport: true,
+    fieldType: 'grass',
     positions: ['Arquero', 'Defensor', 'Mediocampista', 'Delantero'],
-    matchExtraFields: ['equipo'],
     matchStats: [
       { key: 'goles', label: 'Goles', type: 'number' },
       { key: 'asistencias', label: 'Asistencias', type: 'number' }
@@ -3691,15 +3690,78 @@ const SPORT_TEMPLATES = {
     label: 'Pádel',
     hasTrainings: false,
     hasProfileClub: false,
+    teamSport: false,
+    fieldType: 'synthetic-blue',
     matchExtraFields: ['club'],
     matchStats: [
       { key: 'raqueta', label: 'Raqueta usada', type: 'text' }
     ]
+  },
+  tenis: {
+    label: 'Tenis',
+    hasTrainings: true,
+    hasProfileClub: false,
+    teamSport: false,
+    fieldType: 'clay',
+    matchExtraFields: ['club'],
+    matchStats: [{ key: 'sets', label: 'Sets ganados', type: 'text' }]
+  },
+  golf: {
+    label: 'Golf',
+    hasTrainings: true,
+    hasProfileClub: false,
+    teamSport: false,
+    fieldType: 'golf',
+    matchExtraFields: ['club'],
+    matchStats: [
+      { key: 'golpes', label: 'Golpes totales', type: 'number' },
+      { key: 'handicap', label: 'Handicap del día', type: 'number' }
+    ]
+  },
+  running: {
+    label: 'Running',
+    hasTrainings: false,
+    hasProfileClub: false,
+    teamSport: false,
+    fieldType: 'track',
+    matchStats: [
+      { key: 'distanciaKm', label: 'Distancia (km)', type: 'number' },
+      { key: 'tiempo', label: 'Tiempo', type: 'text' }
+    ]
+  },
+  basquet: {
+    label: 'Básquet',
+    hasTrainings: true,
+    hasProfileClub: false,
+    teamSport: true,
+    fieldType: 'court',
+    positions: ['Base', 'Escolta', 'Alero', 'Ala-pívot', 'Pívot'],
+    matchStats: [{ key: 'puntos', label: 'Puntos', type: 'number' }]
+  },
+  hockey: {
+    label: 'Hockey',
+    hasTrainings: true,
+    hasProfileClub: true,
+    teamSport: true,
+    fieldType: 'turf',
+    positions: ['Arquera/o', 'Defensa', 'Volante', 'Delantera/o'],
+    matchStats: [{ key: 'goles', label: 'Goles', type: 'number' }]
   }
+};
+const FIELD_BACKGROUNDS = {
+  grass: 'linear-gradient(160deg, #1B4D2E 0%, #123420 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0 36px, rgba(255,255,255,0.10) 36px 72px)',
+  'synthetic-blue': 'linear-gradient(160deg, #0B3D5C 0%, #0A2C42 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0 36px, rgba(255,255,255,0.09) 36px 72px)',
+  clay: 'linear-gradient(160deg, #A6552E 0%, #7A3B1F 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.04) 0 36px, rgba(255,255,255,0.08) 36px 72px)',
+  golf: 'linear-gradient(160deg, #2E7D42 0%, #1F5C33 40%, #123420 70%, #14181C 100%)',
+  track: 'linear-gradient(160deg, #7A2E2E 0%, #591F1F 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.04) 0 36px, rgba(255,255,255,0.08) 36px 72px)',
+  court: 'linear-gradient(160deg, #8A5A30 0%, #603D1E 55%, #14181C 100%)',
+  turf: 'linear-gradient(160deg, #145C33 0%, #0D3D22 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0 36px, rgba(255,255,255,0.10) 36px 72px)'
 };
 let currentSportKey = 'rugby';
 let sportMatchSelectedClub = null;
 let sportProfileSelectedClub = null;
+let sportMyClubSelected = null;
+let sportRivalClubSelected = null;
 let editingMatchId = null;
 let editingTrainingId = null;
 
@@ -3744,6 +3806,60 @@ function computeSportStats(key) {
   return { record, streak, streakResult, avgRating, statSums, totalMatches: matches.length };
 }
 
+function renderSportsSubtabs() {
+  const enabled = state.sports.enabledSports || ['rugby', 'futbol', 'padel'];
+  const container = document.getElementById('sports-subtabs');
+  container.innerHTML = enabled.map(key => `<button class="subtab${key === currentSportKey ? ' active' : ''}" data-sportkey="${key}">${SPORT_TEMPLATES[key].label}</button>`).join('')
+    + `<button class="subtab${currentSportKey === 'actividad' ? ' active' : ''}" data-sportkey="actividad">Actividad</button>`
+    + `<button class="subtab" id="add-sport-btn" type="button">+</button>`;
+  container.querySelectorAll('[data-sportkey]').forEach(btn => {
+    btn.onclick = () => {
+      currentSportKey = btn.dataset.sportkey;
+      editingMatchId = null;
+      editingTrainingId = null;
+      container.querySelectorAll('.subtab').forEach(b => b.classList.toggle('active', b === btn));
+      if (currentSportKey === 'actividad') {
+        document.getElementById('sports-content').style.display = 'none';
+        document.getElementById('sports-actividad-content').style.display = 'block';
+      } else {
+        document.getElementById('sports-actividad-content').style.display = 'none';
+        document.getElementById('sports-content').style.display = 'block';
+        renderSportSection();
+      }
+      updateHeroVisibility();
+    };
+  });
+  document.getElementById('add-sport-btn').onclick = openAddSportPicker;
+}
+function openAddSportPicker() {
+  const enabled = state.sports.enabledSports || [];
+  const available = Object.keys(SPORT_TEMPLATES).filter(k => !enabled.includes(k));
+  const list = document.getElementById('add-sport-list');
+  const empty = document.getElementById('add-sport-empty');
+  if (!available.length) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    list.innerHTML = available.map(k => `<button type="button" class="btn secondary" data-add-sport="${k}">${SPORT_TEMPLATES[k].label}</button>`).join('');
+    list.querySelectorAll('[data-add-sport]').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.addSport;
+        if (!state.sports.enabledSports) state.sports.enabledSports = [];
+        state.sports.enabledSports.push(key);
+        persistSports();
+        currentSportKey = key;
+        renderSportsSubtabs();
+        document.getElementById('sports-actividad-content').style.display = 'none';
+        document.getElementById('sports-content').style.display = 'block';
+        renderSportSection();
+        updateHeroVisibility();
+        document.getElementById('add-sport-overlay').style.display = 'none';
+      };
+    });
+  }
+  document.getElementById('add-sport-overlay').style.display = 'flex';
+}
 function computeForm(matches) {
   return [...matches].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
     .map(m => m.result === 'ganado' ? 'G' : m.result === 'perdido' ? 'P' : 'E');
@@ -3752,25 +3868,33 @@ function updateHeroVisibility() {
   const onSports = activeTab === 'deportes' && currentSportKey !== 'actividad';
   document.getElementById('calorie-hero').style.display = onSports ? 'none' : '';
   document.getElementById('sports-hero').style.display = onSports ? 'block' : 'none';
-  if (onSports) renderSportsHero();
+  if (onSports) {
+    const tpl = SPORT_TEMPLATES[currentSportKey];
+    document.getElementById('sports-hero').style.background = (tpl && FIELD_BACKGROUNDS[tpl.fieldType]) || FIELD_BACKGROUNDS.grass;
+    renderSportsHero();
+  }
 }
 function renderSportsHero() {
   const tpl = SPORT_TEMPLATES[currentSportKey];
   const profile = sportProfile(currentSportKey);
   const stats = computeSportStats(currentSportKey);
-  const form = computeForm(sportMatches(currentSportKey));
+  const matches = sportMatches(currentSportKey);
+  const form = computeForm(matches);
   const photo = state.photos.sportPhotos && state.photos.sportPhotos[currentSportKey];
   const content = document.getElementById('sports-hero-content');
-  const formColors = { G: 'rgba(31,111,74,0.55)', P: 'rgba(155,44,59,0.55)', E: 'rgba(184,137,43,0.55)' };
+  const formColors = { G: 'rgba(31,111,74,0.6)', P: 'rgba(155,44,59,0.6)', E: 'rgba(184,137,43,0.6)' };
+  const club = tpl.hasProfileClub ? profile.club : null;
+
   content.innerHTML = `
-    <div style="display:flex; gap:14px; align-items:center;">
-      <div style="width:64px; height:64px; border-radius:50%; overflow:hidden; background:rgba(255,255,255,0.08); flex-shrink:0; display:flex; align-items:center; justify-content:center;">
-        ${photo ? `<img src="${photo.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:10px; color:#8B939A; text-align:center;">Sin foto</span>`}
+    <div style="display:flex; gap:16px; align-items:flex-start;">
+      <div style="width:96px; height:96px; border-radius:18px; overflow:hidden; background:rgba(255,255,255,0.1); flex-shrink:0; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.15);">
+        ${photo ? `<img src="${photo.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:10px; color:#B9C0C6; text-align:center; padding:4px;">Sin foto</span>`}
       </div>
-      <div>
-        <div style="font-family:'Manrope',sans-serif; font-weight:800; font-size:19px; color:var(--bg);">${tpl.label}</div>
-        <div style="font-size:12px; color:#9BA3AA; margin-top:2px;">${profile.position ? escapeHtml(profile.position) + ' · ' : ''}${profile.level || 'amateur'}</div>
-        <button type="button" class="linkbtn" id="sports-hero-photo-btn" style="margin-top:4px; color:#9BA3AA; font-size:11px;">${photo ? 'Cambiar foto' : 'Subir foto'}</button>
+      <div style="flex:1; padding-top:2px;">
+        <div style="font-family:'Manrope',sans-serif; font-weight:800; font-size:21px; color:var(--bg); line-height:1.1;">${tpl.label}</div>
+        <div style="font-size:12px; color:#C7CDD2; margin-top:4px;">${profile.position ? escapeHtml(profile.position) + ' · ' : ''}${profile.level || 'amateur'}</div>
+        ${club ? `<div style="display:flex; align-items:center; gap:6px; margin-top:6px;">${clubBadgeHtml(club, 20)}<span style="font-size:12px; color:#C7CDD2;">${escapeHtml(club.name)}</span></div>` : ''}
+        <button type="button" class="linkbtn" id="sports-hero-photo-btn" style="margin-top:8px; color:#C7CDD2; font-size:11px;">${photo ? 'Cambiar foto' : 'Subir foto'}</button>
       </div>
     </div>
     <input type="file" accept="image/*" id="sports-hero-photo-input" style="display:none;">
@@ -3781,7 +3905,9 @@ function renderSportsHero() {
       <div class="hero-breakdown-item"><div class="stat-label">Partidos</div><div class="stat-value">${stats.totalMatches}</div></div>
       <div class="hero-breakdown-item"><div class="stat-label">Entrenamientos</div><div class="stat-value">${sportTrainings(currentSportKey).length}</div></div>
       <div class="hero-breakdown-item"><div class="stat-label">Récord</div><div class="stat-value" style="font-size:15px;">${stats.record.g}G-${stats.record.e}E-${stats.record.p}P</div></div>
-    </div>`;
+    </div>
+    ${matches.length >= 2 ? `<div style="margin-top:16px;"><canvas id="sports-hero-chart" height="110"></canvas></div>` : ''}`;
+
   document.getElementById('sports-hero-photo-btn').onclick = () => document.getElementById('sports-hero-photo-input').click();
   document.getElementById('sports-hero-photo-input').onchange = async (e) => {
     const file = e.target.files[0];
@@ -3792,12 +3918,72 @@ function renderSportsHero() {
     persistPhotos();
     renderSportsHero();
   };
+  if (matches.length >= 2) {
+    const sortedAsc = [...matches].sort((a, b) => a.date.localeCompare(b.date)).slice(-8);
+    drawChart('sports-hero-chart', 'bar', {
+      labels: sortedAsc.map(m => fmtLabel(m.date)),
+      datasets: [{ label: 'Autoevaluación', data: sortedAsc.map(m => m.selfRating || 0), backgroundColor: sortedAsc.map(m => m.result === 'ganado' ? 'rgba(31,111,74,0.75)' : m.result === 'perdido' ? 'rgba(155,44,59,0.75)' : 'rgba(184,137,43,0.75)') }]
+    }, { scales: { y: { min: 0, max: 10, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#C7CDD2' } }, x: { grid: { display: false }, ticks: { color: '#C7CDD2', font: { size: 9 } } } }, plugins: { legend: { display: false } } });
+  }
+}
+function clubBadgeHtml(club, size) {
+  size = size || 44;
+  if (!club || !club.name) return `<div style="width:${size}px; height:${size}px; border-radius:50%; background:rgba(255,255,255,0.12); flex-shrink:0;"></div>`;
+  if (club.badgeUrl) return `<img src="${club.badgeUrl}" style="width:${size}px; height:${size}px; object-fit:contain; flex-shrink:0;">`;
+  const initials = club.name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+  return `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#9AA1A8; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-family:'Manrope',sans-serif; font-size:${Math.round(size * 0.32)}px; flex-shrink:0;">${initials}</div>`;
+}
+let expandedMatchIds = new Set();
+function matchCardHtml(m, tpl) {
+  const expanded = expandedMatchIds.has(m.id);
+  const resultColor = m.result === 'ganado' ? 'var(--accent)' : m.result === 'perdido' ? 'var(--danger)' : 'var(--gold)';
+  let matchupHtml;
+  if (tpl.teamSport) {
+    const isHome = m.isHome !== false;
+    const myClub = tpl.hasProfileClub ? sportProfile(currentSportKey).club : m.myClub;
+    const left = isHome ? myClub : m.rivalClub;
+    const right = isHome ? m.rivalClub : myClub;
+    matchupHtml = `
+      <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-top:8px;">
+        <div style="text-align:center;">${clubBadgeHtml(left)}<div class="entry-meta" style="margin-top:4px; max-width:80px;">${left ? escapeHtml(left.name) : '—'}</div></div>
+        <div style="text-align:center;">
+          <div style="font-weight:800; font-family:'Manrope',sans-serif; font-size:18px;">${escapeHtml(m.score || '—')}</div>
+          <div style="font-size:10px; color:var(--ink-soft);">VS</div>
+        </div>
+        <div style="text-align:center;">${clubBadgeHtml(right)}<div class="entry-meta" style="margin-top:4px; max-width:80px;">${right ? escapeHtml(right.name) : '—'}</div></div>
+      </div>`;
+  } else {
+    matchupHtml = `<div style="text-align:center; margin-top:6px;">
+      <div class="entry-name">vs ${escapeHtml(m.opponent || '—')}</div>
+      <div style="font-weight:800; font-family:'Manrope',sans-serif; font-size:17px; margin-top:4px;">${escapeHtml(m.score || '—')}</div>
+    </div>`;
+  }
+  return `<div class="entry-expandable match-card">
+    <div class="entry" data-toggle-match="${m.id}" style="cursor:pointer; flex-direction:column; align-items:stretch;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="entry-meta">${fmtLabel(m.date)}</span>
+        <span style="color:${resultColor}; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:0.02em;">${m.result}</span>
+        <span class="chevron ${expanded ? 'open' : ''}">›</span>
+      </div>
+      ${matchupHtml}
+    </div>
+    ${expanded ? `<div class="entry-detail" style="flex-direction:column; align-items:stretch; gap:8px; padding-top:0;">
+      <div class="entry-meta">Autoevaluación ${m.selfRating}/10${m.position ? ' · ' + escapeHtml(m.position) : ''}${m.club ? ' · ' + escapeHtml(m.club.name) : ''}</div>
+      ${m.stats && Object.keys(m.stats).length ? `<div class="entry-meta">${Object.entries(m.stats).map(([k, v]) => (tpl.matchStats.find(s => s.key === k) || {}).label + ': ' + v).join(' · ')}</div>` : ''}
+      ${m.whoopData ? `<div class="entry-meta">Whoop: ${m.whoopData.durationMin}min · ${m.whoopData.kcal}kcal${m.whoopData.strain != null ? ' · strain ' + m.whoopData.strain : ''}</div>` : ''}
+      <div style="display:flex; gap:8px;">
+        <button class="linkbtn" data-edit-match="${m.id}">Editar</button>
+        <button class="del" data-remove-match="${m.id}">✕</button>
+      </div>
+    </div>` : ''}
+  </div>`;
 }
 function renderSportSection() {
   if (currentSportKey === 'actividad') return;
   const tpl = SPORT_TEMPLATES[currentSportKey];
   const profile = sportProfile(currentSportKey);
   const stats = computeSportStats(currentSportKey);
+  const matches = sportMatches(currentSportKey);
   const container = document.getElementById('sports-content');
 
   const positionOptions = tpl.positions ? `<option value="">Sin especificar</option>` + tpl.positions.map(p => `<option${profile.position === p ? ' selected' : ''}>${p}</option>`).join('') : null;
@@ -3824,40 +4010,44 @@ function renderSportSection() {
     <button type="button" class="btn secondary" id="sport-profile-save" style="margin-top:12px;">Guardar perfil</button>
   </div>
 
-  <div class="panel">
-    <h3>Estadísticas</h3>
-    ${stats.totalMatches ? `
-      <div class="coach-note">
-        Récord: <strong>${stats.record.g}G - ${stats.record.e}E - ${stats.record.p}P</strong> en ${stats.totalMatches} partido${stats.totalMatches === 1 ? '' : 's'}.
-        ${stats.streak >= 2 ? `<br>Racha actual: ${stats.streak} ${stats.streakResult}${stats.streak === 1 ? '' : 's'} seguidos.` : ''}
-        ${stats.avgRating != null ? `<br>Autoevaluación promedio: ${stats.avgRating}/10.` : ''}
-        ${Object.keys(stats.statSums).length ? '<br>' + Object.entries(stats.statSums).map(([k, v]) => {
-          const label = (tpl.matchStats.find(s => s.key === k) || {}).label || k;
-          return `${escapeHtml(label)}: ${v}`;
-        }).join(' · ') : ''}
-      </div>` : `<div class="empty">Todavía no cargaste partidos de ${tpl.label.toLowerCase()}.</div>`}
+  <div class="panel accordion">
+    <div class="accordion-header" data-accordion="sport-stats"><h3>Estadísticas</h3><span class="chevron">›</span></div>
+    <div class="accordion-body" id="accordion-sport-stats" style="display:none;">
+      ${stats.totalMatches ? `
+        <div class="coach-note">
+          Récord: <strong>${stats.record.g}G - ${stats.record.e}E - ${stats.record.p}P</strong> en ${stats.totalMatches} partido${stats.totalMatches === 1 ? '' : 's'}.
+          ${stats.streak >= 2 ? `<br>Racha actual: ${stats.streak} ${stats.streakResult}${stats.streak === 1 ? '' : 's'} seguidos.` : ''}
+          ${stats.avgRating != null ? `<br>Autoevaluación promedio: ${stats.avgRating}/10.` : ''}
+          ${Object.keys(stats.statSums).length ? '<br>' + Object.entries(stats.statSums).map(([k, v]) => {
+            const label = (tpl.matchStats.find(s => s.key === k) || {}).label || k;
+            return `${escapeHtml(label)}: ${v}`;
+          }).join(' · ') : ''}
+        </div>` : `<div class="empty">Todavía no cargaste partidos de ${tpl.label.toLowerCase()}.</div>`}
+    </div>
   </div>`;
 
   if (tpl.hasTrainings) {
     const trainings = sportTrainings(currentSportKey);
-    html += `<div class="panel">
-      <h3>Cargar entrenamiento</h3>
-      <div class="form-row" style="margin-top:0;">
-        <div class="field"><label>Fecha</label><input type="date" id="training-date" value="${todayStr()}"></div>
-        <div class="field"><label>RPE (esfuerzo 1-10)</label><input type="number" id="training-rpe" min="1" max="10" value="7"></div>
-        <div class="field"><label>¿Cómo te sentiste?</label>
-          <select id="training-feeling">
-            <option value="muy bien">Muy bien</option>
-            <option value="bien" selected>Bien</option>
-            <option value="regular">Regular</option>
-            <option value="mal">Mal</option>
-          </select>
+    html += `<div class="panel accordion">
+      <div class="accordion-header" data-accordion="sport-training"><h3>Cargar entrenamiento</h3><span class="chevron ${editingTrainingId ? 'open' : ''}"${editingTrainingId ? '' : ''}>›</span></div>
+      <div class="accordion-body" id="accordion-sport-training" style="display:${editingTrainingId ? 'block' : 'none'};">
+        <div class="form-row" style="margin-top:0;">
+          <div class="field"><label>Fecha</label><input type="date" id="training-date" value="${todayStr()}"></div>
+          <div class="field"><label>RPE (esfuerzo 1-10)</label><input type="number" id="training-rpe" min="1" max="10" value="7"></div>
+          <div class="field"><label>¿Cómo te sentiste?</label>
+            <select id="training-feeling">
+              <option value="muy bien">Muy bien</option>
+              <option value="bien" selected>Bien</option>
+              <option value="regular">Regular</option>
+              <option value="mal">Mal</option>
+            </select>
+          </div>
         </div>
+        <div class="field" style="margin-top:10px;"><label>Foco del entrenamiento</label><input type="text" id="training-focus" placeholder="Ej: scrum y contacto"></div>
+        ${whoopLinkFieldHtml('training-whoop-link')}
+        <button type="button" class="btn secondary" id="training-add-btn" style="margin-top:10px;">${editingTrainingId ? 'Guardar cambios' : 'Agregar entrenamiento'}</button>
+        ${editingTrainingId ? `<button type="button" class="linkbtn" id="training-cancel-edit">Cancelar edición</button>` : ''}
       </div>
-      <div class="field" style="margin-top:10px;"><label>Foco del entrenamiento</label><input type="text" id="training-focus" placeholder="Ej: scrum y contacto"></div>
-      ${whoopLinkFieldHtml('training-whoop-link')}
-      <button type="button" class="btn secondary" id="training-add-btn" style="margin-top:10px;">${editingTrainingId ? 'Guardar cambios' : 'Agregar entrenamiento'}</button>
-      ${editingTrainingId ? `<button type="button" class="linkbtn" id="training-cancel-edit">Cancelar edición</button>` : ''}
     </div>
     <div class="panel">
       <h3>Entrenamientos recientes</h3>
@@ -3877,53 +4067,61 @@ function renderSportSection() {
   }
 
   const extra = tpl.matchExtraFields || [];
-  html += `<div class="panel">
-    <h3>Cargar partido</h3>
-    <div class="form-row" style="margin-top:0;">
-      <div class="field"><label>Fecha</label><input type="date" id="match-date" value="${todayStr()}"></div>
-      <div class="field"><label>Rival</label><input type="text" id="match-opponent" placeholder="Con quién jugaste"></div>
-      <div class="field"><label>Resultado</label>
-        <select id="match-result">
-          <option value="ganado">Ganado</option>
-          <option value="empatado">Empatado</option>
-          <option value="perdido">Perdido</option>
-        </select>
+  const needsMyClub = tpl.teamSport && !tpl.hasProfileClub;
+  html += `<div class="panel accordion">
+    <div class="accordion-header" data-accordion="sport-match"><h3>Cargar partido</h3><span class="chevron">›</span></div>
+    <div class="accordion-body" id="accordion-sport-match" style="display:${editingMatchId ? 'block' : 'none'};">
+      <div class="form-row" style="margin-top:0;">
+        <div class="field"><label>Fecha</label><input type="date" id="match-date" value="${todayStr()}"></div>
+        <div class="field"><label>Resultado</label>
+          <select id="match-result">
+            <option value="ganado">Ganado</option>
+            <option value="empatado">Empatado</option>
+            <option value="perdido">Perdido</option>
+          </select>
+        </div>
+        <div class="field"><label>Marcador</label><input type="text" id="match-score" placeholder="Ej: 24-17"></div>
       </div>
+      ${tpl.teamSport ? `
+        <div class="field" style="margin-top:10px;"><label>Local o visitante</label>
+          <select id="match-home">
+            <option value="local">Jugué de local</option>
+            <option value="visitante">Jugué de visitante</option>
+          </select>
+        </div>
+        ${needsMyClub ? `<div class="field" style="margin-top:10px;">
+          <label>Mi equipo</label>
+          <input type="text" id="match-myclub-search" placeholder="Buscá tu equipo">
+          <div id="match-myclub-results" class="club-results"></div>
+          <div class="hint" id="match-myclub-selected" style="margin-top:6px;"></div>
+        </div>` : ''}
+        <div class="field" style="margin-top:10px;">
+          <label>Rival</label>
+          <input type="text" id="match-rival-search" placeholder="Buscá el club rival">
+          <div id="match-rival-results" class="club-results"></div>
+          <div class="hint" id="match-rival-selected" style="margin-top:6px;"></div>
+        </div>` : `
+        <div class="field" style="margin-top:10px;"><label>Rival</label><input type="text" id="match-opponent" placeholder="Con quién jugaste"></div>`}
+      <div class="form-row" style="margin-top:10px;">
+        <div class="field"><label>Tu autoevaluación (1-10)</label><input type="number" id="match-rating" min="1" max="10" value="7"></div>
+        ${tpl.positions ? `<div class="field"><label>Posición jugada</label><select id="match-position">${positionOptions}</select></div>` : ''}
+      </div>
+      ${extra.includes('club') ? `<div class="field" style="margin-top:10px;">
+        <label>Club / lugar donde jugaste</label>
+        <input type="text" id="match-club-search" placeholder="Buscá el club">
+        <div id="match-club-results" class="club-results"></div>
+        <div class="hint" id="match-club-selected" style="margin-top:6px;"></div>
+      </div>` : ''}
+      ${(tpl.matchStats || []).length ? `<div class="form-row" style="margin-top:10px;">
+        ${tpl.matchStats.map(st => `<div class="field"><label>${escapeHtml(st.label)}</label><input type="${st.type === 'number' ? 'number' : 'text'}" id="match-stat-${st.key}"></div>`).join('')}
+      </div>` : ''}
+      ${whoopLinkFieldHtml('match-whoop-link')}
+      <button type="button" class="btn" id="match-add-btn" style="margin-top:12px;">${editingMatchId ? 'Guardar cambios' : 'Agregar partido'}</button>
+      ${editingMatchId ? `<button type="button" class="linkbtn" id="match-cancel-edit">Cancelar edición</button>` : ''}
     </div>
-    <div class="form-row" style="margin-top:10px;">
-      <div class="field"><label>Marcador</label><input type="text" id="match-score" placeholder="Ej: 24-17"></div>
-      <div class="field"><label>Tu autoevaluación (1-10)</label><input type="number" id="match-rating" min="1" max="10" value="7"></div>
-      ${tpl.positions ? `<div class="field"><label>Posición jugada</label><select id="match-position">${positionOptions}</select></div>` : ''}
-    </div>
-    ${extra.includes('equipo') ? `<div class="field" style="margin-top:10px;"><label>Equipo</label><input type="text" id="match-team" placeholder="Con qué equipo jugaste"></div>` : ''}
-    ${extra.includes('club') ? `<div class="field" style="margin-top:10px;">
-      <label>Club / lugar donde jugaste</label>
-      <input type="text" id="match-club-search" placeholder="Buscá el club">
-      <div id="match-club-results" class="club-results"></div>
-      <div class="hint" id="match-club-selected" style="margin-top:6px;"></div>
-    </div>` : ''}
-    ${(tpl.matchStats || []).length ? `<div class="form-row" style="margin-top:10px;">
-      ${tpl.matchStats.map(st => `<div class="field"><label>${escapeHtml(st.label)}</label><input type="${st.type === 'number' ? 'number' : 'text'}" id="match-stat-${st.key}"></div>`).join('')}
-    </div>` : ''}
-    ${whoopLinkFieldHtml('match-whoop-link')}
-    <button type="button" class="btn" id="match-add-btn" style="margin-top:12px;">${editingMatchId ? 'Guardar cambios' : 'Agregar partido'}</button>
-    ${editingMatchId ? `<button type="button" class="linkbtn" id="match-cancel-edit">Cancelar edición</button>` : ''}
   </div>
-  <div class="panel">
-    <h3>Partidos</h3>
-    ${sportMatches(currentSportKey).length ? [...sportMatches(currentSportKey)].sort((a, b) => b.date.localeCompare(a.date)).map(m => `
-      <div class="entry">
-        <div>
-          <div class="entry-name">${fmtLabel(m.date)} vs ${escapeHtml(m.opponent || '—')} · <span style="color:${m.result === 'ganado' ? 'var(--accent)' : m.result === 'perdido' ? 'var(--danger)' : 'var(--gold)'};">${m.result}</span></div>
-          <div class="entry-meta">${m.score ? m.score + ' · ' : ''}Autoevaluación ${m.selfRating}/10${m.position ? ' · ' + escapeHtml(m.position) : ''}${m.club ? ' · ' + escapeHtml(m.club.name) : ''}${m.team ? ' · ' + escapeHtml(m.team) : ''}</div>
-          ${m.whoopData ? `<div class="entry-meta">Whoop: ${m.whoopData.durationMin}min · ${m.whoopData.kcal}kcal${m.whoopData.strain != null ? ' · strain ' + m.whoopData.strain : ''}</div>` : ''}
-          ${m.stats && Object.keys(m.stats).length ? `<div class="entry-meta">${Object.entries(m.stats).map(([k, v]) => (tpl.matchStats.find(s => s.key === k) || {}).label + ': ' + v).join(' · ')}</div>` : ''}
-        </div>
-        <div class="entry-right">
-          <button class="linkbtn" data-edit-match="${m.id}">Editar</button>
-          <button class="del" data-remove-match="${m.id}">✕</button>
-        </div>
-      </div>`).join('') : '<div class="empty">Todavía no cargaste partidos.</div>'}
+  <div id="match-cards-list">
+    ${matches.length ? [...matches].sort((a, b) => b.date.localeCompare(a.date)).map(m => matchCardHtml(m, tpl)).join('') : '<div class="empty">Todavía no cargaste partidos.</div>'}
   </div>`;
 
   container.innerHTML = html;
@@ -3933,6 +4131,26 @@ function renderSportSection() {
 function wireSportSectionEvents(tpl) {
   sportMatchSelectedClub = null;
   sportProfileSelectedClub = null;
+  sportMyClubSelected = null;
+  sportRivalClubSelected = null;
+
+  document.querySelectorAll('#sports-content .accordion-header').forEach(header => {
+    header.onclick = () => {
+      const body = document.getElementById('accordion-' + header.dataset.accordion);
+      const chevron = header.querySelector('.chevron');
+      const open = body.style.display === 'block';
+      body.style.display = open ? 'none' : 'block';
+      if (chevron) chevron.classList.toggle('open', !open);
+    };
+  });
+  document.querySelectorAll('[data-toggle-match]').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('.del') || e.target.closest('[data-edit-match]')) return;
+      const id = el.dataset.toggleMatch;
+      if (expandedMatchIds.has(id)) expandedMatchIds.delete(id); else expandedMatchIds.add(id);
+      renderSportSection();
+    };
+  });
 
   if (tpl.hasProfileClub) {
     wireClubSearch('sport-profile-club-search', 'sport-profile-club-results', (team) => {
@@ -4001,22 +4219,40 @@ function wireSportSectionEvents(tpl) {
   }
 
   const extra = tpl.matchExtraFields || [];
+  const needsMyClub = tpl.teamSport && !tpl.hasProfileClub;
   if (extra.includes('club')) {
     wireClubSearch('match-club-search', 'match-club-results', (team) => {
       sportMatchSelectedClub = { name: team.name, badgeUrl: team.badgeUrl };
       document.getElementById('match-club-selected').textContent = 'Elegiste: ' + team.name;
     });
   }
+  if (tpl.teamSport) {
+    wireClubSearch('match-rival-search', 'match-rival-results', (team) => {
+      sportRivalClubSelected = { name: team.name, badgeUrl: team.badgeUrl };
+      document.getElementById('match-rival-selected').textContent = 'Rival: ' + team.name;
+    });
+    if (needsMyClub) {
+      wireClubSearch('match-myclub-search', 'match-myclub-results', (team) => {
+        sportMyClubSelected = { name: team.name, badgeUrl: team.badgeUrl };
+        document.getElementById('match-myclub-selected').textContent = 'Mi equipo: ' + team.name;
+      });
+    }
+  }
   if (editingMatchId) {
     const m = sportMatches(currentSportKey).find(x => x.id === editingMatchId);
     if (m) {
       document.getElementById('match-date').value = m.date;
-      document.getElementById('match-opponent').value = m.opponent || '';
       document.getElementById('match-result').value = m.result;
       document.getElementById('match-score').value = m.score || '';
       document.getElementById('match-rating').value = m.selfRating || '';
       if (tpl.positions) document.getElementById('match-position').value = m.position || '';
-      if (extra.includes('equipo')) document.getElementById('match-team').value = m.team || '';
+      if (tpl.teamSport) {
+        document.getElementById('match-home').value = m.isHome === false ? 'visitante' : 'local';
+        if (m.rivalClub) { sportRivalClubSelected = m.rivalClub; document.getElementById('match-rival-selected').textContent = 'Rival: ' + m.rivalClub.name; }
+        if (needsMyClub && m.myClub) { sportMyClubSelected = m.myClub; document.getElementById('match-myclub-selected').textContent = 'Mi equipo: ' + m.myClub.name; }
+      } else {
+        document.getElementById('match-opponent').value = m.opponent || '';
+      }
       if (extra.includes('club') && m.club) {
         sportMatchSelectedClub = m.club;
         document.getElementById('match-club-selected').textContent = 'Elegiste: ' + m.club.name;
@@ -4037,14 +4273,18 @@ function wireSportSectionEvents(tpl) {
     const whoopSel = getWhoopLinkData('match-whoop-link');
     const matchData = {
       date: document.getElementById('match-date').value || todayStr(),
-      opponent: document.getElementById('match-opponent').value.trim(),
       result: document.getElementById('match-result').value,
       score: document.getElementById('match-score').value.trim(),
       selfRating: Number(document.getElementById('match-rating').value) || null,
       stats
     };
     if (tpl.positions) matchData.position = document.getElementById('match-position').value;
-    if (extra.includes('equipo')) matchData.team = document.getElementById('match-team').value.trim();
+    if (tpl.teamSport) {
+      matchData.isHome = document.getElementById('match-home').value !== 'visitante';
+      matchData.opponent = sportRivalClubSelected ? sportRivalClubSelected.name : null;
+    } else {
+      matchData.opponent = document.getElementById('match-opponent').value.trim();
+    }
     if (extra.includes('club') && sportMatchSelectedClub) matchData.club = sportMatchSelectedClub;
     if (!state.sports.matches[currentSportKey]) state.sports.matches[currentSportKey] = [];
     if (editingMatchId) {
@@ -4053,12 +4293,17 @@ function wireSportSectionEvents(tpl) {
         const prev = state.sports.matches[currentSportKey][idx];
         matchData.whoopData = whoopSel || prev.whoopData || null;
         matchData.club = matchData.club || prev.club || null;
+        matchData.rivalClub = sportRivalClubSelected || prev.rivalClub || null;
+        matchData.myClub = sportMyClubSelected || prev.myClub || null;
+        matchData.opponent = matchData.opponent || prev.opponent || null;
         state.sports.matches[currentSportKey][idx] = { ...prev, ...matchData };
       }
       editingMatchId = null;
     } else {
       matchData.id = uid();
       matchData.whoopData = whoopSel;
+      matchData.rivalClub = sportRivalClubSelected;
+      matchData.myClub = sportMyClubSelected;
       state.sports.matches[currentSportKey].push(matchData);
     }
     persistSports();
@@ -4067,7 +4312,7 @@ function wireSportSectionEvents(tpl) {
   const matchCancelBtn = document.getElementById('match-cancel-edit');
   if (matchCancelBtn) matchCancelBtn.onclick = () => { editingMatchId = null; renderSportSection(); };
   document.querySelectorAll('[data-edit-match]').forEach(btn => {
-    btn.onclick = () => { editingMatchId = btn.dataset.editMatch; renderSportSection(); };
+    btn.onclick = () => { editingMatchId = btn.dataset.editMatch; expandedMatchIds.add(btn.dataset.editMatch); renderSportSection(); };
   });
   document.querySelectorAll('[data-remove-match]').forEach(btn => {
     btn.onclick = () => {
@@ -4116,6 +4361,7 @@ async function startApp() {
   }
   setSaving('Cargando…');
   await loadAll();
+  renderSportsSubtabs();
   await whoopHandleRedirectIfPresent();
   setSaving('');
   renderAll();
