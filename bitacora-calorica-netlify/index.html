@@ -2310,7 +2310,23 @@ async function whoopSync() {
     let alreadyImported = 0;
     let notScored = 0;
     records.forEach(r => {
-      if (state.gym.whoopImportedIds.includes(r.id)) { alreadyImported++; return; }
+      if (state.gym.whoopImportedIds.includes(r.id)) {
+        alreadyImported++;
+        // ya estaba importado como actividad de antes de que existiera el pool vinculable —
+        // lo rescatamos igual para que se pueda vincular a un partido/entrenamiento viejo.
+        if (r.score_state === 'SCORED' && r.score && !state.gym.whoopWorkoutPool.some(w => w.id === r.id)) {
+          const dateStr = isoToLocalDateStr(r.start);
+          const durationMin = Math.round((new Date(r.end) - new Date(r.start)) / 60000);
+          const kcal = r.score.kilojoule != null ? Math.round(r.score.kilojoule / 4.184) : 0;
+          state.gym.whoopWorkoutPool.push({
+            id: r.id, date: dateStr, durationMin, kcal,
+            strain: r.score.strain != null ? Math.round(r.score.strain * 10) / 10 : null,
+            avgHr: r.score.average_heart_rate || null,
+            maxHr: r.score.max_heart_rate || null
+          });
+        }
+        return;
+      }
       if (r.score_state !== 'SCORED' || !r.score) { notScored++; return; }
       const dateStr = isoToLocalDateStr(r.start);
       const durationMin = Math.round((new Date(r.end) - new Date(r.start)) / 60000);
@@ -2318,15 +2334,17 @@ async function whoopSync() {
       addActivity(dateStr, { name: 'Entrenamiento Whoop (tipo #' + r.sport_id + ')', calories: kcal, duration: durationMin, source: 'whoop' });
       state.gym.whoopImportedIds.push(r.id);
       if (!state.gym.whoopWorkoutPool) state.gym.whoopWorkoutPool = [];
-      state.gym.whoopWorkoutPool.unshift({
+      state.gym.whoopWorkoutPool.push({
         id: r.id, date: dateStr, durationMin, kcal,
         strain: r.score.strain != null ? Math.round(r.score.strain * 10) / 10 : null,
         avgHr: r.score.average_heart_rate || null,
         maxHr: r.score.max_heart_rate || null
       });
-      state.gym.whoopWorkoutPool = state.gym.whoopWorkoutPool.slice(0, 30);
       imported++;
     });
+    state.gym.whoopWorkoutPool = state.gym.whoopWorkoutPool
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 30);
     await persistGym();
     renderAll();
     errorBox.classList.remove('show');
