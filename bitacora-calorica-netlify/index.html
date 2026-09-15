@@ -3934,6 +3934,7 @@ function renderSportsHero() {
     </div>
     ${matches.length >= 2 ? `<div style="margin-top:16px;"><canvas id="sports-hero-chart" height="110"></canvas></div>` : ''}
     <div style="margin-top:14px; text-align:right;">
+      ${(state.photos.sportBackgrounds && state.photos.sportBackgrounds[currentSportKey]) ? `<button type="button" class="linkbtn" id="sports-hero-bg-reset" style="color:#C7CDD2; font-size:11px; margin-right:12px;">Restablecer fondo por defecto</button>` : ''}
       <button type="button" class="linkbtn" id="sports-hero-bg-btn" style="color:#C7CDD2; font-size:11px;">${(state.photos.sportBackgrounds && state.photos.sportBackgrounds[currentSportKey]) ? 'Cambiar fondo de cancha' : 'Subir foto de fondo (cancha/club)'}</button>
       <input type="file" accept="image/*" id="sports-hero-bg-input" style="display:none;">
     </div>`;
@@ -3949,6 +3950,13 @@ function renderSportsHero() {
     renderSportsHero();
   };
   document.getElementById('sports-hero-bg-btn').onclick = () => document.getElementById('sports-hero-bg-input').click();
+  const bgResetBtn = document.getElementById('sports-hero-bg-reset');
+  if (bgResetBtn) bgResetBtn.onclick = () => {
+    if (state.photos.sportBackgrounds) delete state.photos.sportBackgrounds[currentSportKey];
+    persistPhotos();
+    applySportsHeroBackground();
+    renderSportsHero();
+  };
   document.getElementById('sports-hero-bg-input').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
