@@ -226,6 +226,7 @@
       </div>
       <div>
         <div class="title">Nutrym</div>
+        <div class="hint" id="user-name-label" style="margin-top:0;"></div>
         <div class="saving" id="saving-indicator">&nbsp;</div>
         <div class="offline-badge" id="offline-badge">Sin conexión — guardando local</div>
       </div>
@@ -2425,11 +2426,20 @@ async function askNutria(category, question) {
 }
 
 async function callAiFunction(payload) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
   const res = await fetch('/.netlify/functions/ai', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-App-Token': APP_TOKEN,
+      'Authorization': 'Bearer ' + (session ? session.access_token : '')
+    },
     body: JSON.stringify(payload)
   });
+  if (res.status === 429) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Llegaste al límite diario de uso de IA. Probá de nuevo mañana.');
+  }
   if (!res.ok) throw new Error('función IA: ' + res.status);
   return res.json();
 }
@@ -3321,6 +3331,11 @@ async function init() {
 async function startApp() {
   document.getElementById('login-gate').style.display = 'none';
   document.getElementById('app-wrap').style.display = '';
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (user) {
+    const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email;
+    document.getElementById('user-name-label').textContent = name;
+  }
   setSaving('Cargando…');
   await loadAll();
   await whoopHandleRedirectIfPresent();

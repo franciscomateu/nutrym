@@ -1,14 +1,52 @@
 // Función serverless: intermediaria entre el front y la API de Anthropic.
 // La API key vive solo acá (variable de entorno de Netlify), nunca en el navegador.
 // Un token compartido simple (APP_TOKEN) evita que alguien que encuentre la URL
-// de esta función te consuma la cuota sin tu conocimiento.
+// de esta función te consuma la cuota sin tu conocimiento. Además, cada usuario
+// logueado tiene un límite diario propio de uso de IA (Fase 2 multi-usuario).
 
 const MODEL = 'claude-sonnet-4-6';
+const PHOTO_DAILY_LIMIT = Number(process.env.PHOTO_DAILY_LIMIT) || 15;
+const CHAT_DAILY_LIMIT = Number(process.env.CHAT_DAILY_LIMIT) || 30;
+
+async function getSupabaseUser(authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+  const res = await fetch(process.env.SUPABASE_URL + '/auth/v1/user', {
+    headers: { 'Authorization': 'Bearer ' + token, 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY }
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data && data.id ? data : null;
+}
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+async function getUsage(userId) {
+  const res = await fetch(
+    process.env.SUPABASE_URL + '/rest/v1/ai_usage?user_id=eq.' + userId + '&date=eq.' + todayStr() + '&select=photo_calls,chat_calls',
+    { headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY } }
+  );
+  if (!res.ok) return { photo_calls: 0, chat_calls: 0 };
+  const rows = await res.json();
+  return rows[0] || { photo_calls: 0, chat_calls: 0 };
+}
+async function incrementUsage(userId, bucket, current) {
+  const row = { user_id: userId, date: todayStr(), photo_calls: current.photo_calls || 0, chat_calls: current.chat_calls || 0 };
+  row[bucket] = (row[bucket] || 0) + 1;
+  await fetch(process.env.SUPABASE_URL + '/rest/v1/ai_usage', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(row)
+  }).catch(() => {});
+}
 
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 
@@ -27,11 +65,25 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Falta configurar ANTHROPIC_API_KEY en Netlify' }) };
   }
 
+  const authHeader = event.headers['authorization'] || event.headers['Authorization'];
+  const user = await getSupabaseUser(authHeader);
+  if (!user) {
+    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Sesión inválida — volvé a iniciar sesión' }) };
+  }
+
   let payload;
   try {
     payload = JSON.parse(event.body || '{}');
   } catch (e) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body inválido' }) };
+  }
+
+  const bucket = payload.action === 'foto' ? 'photo_calls' : 'chat_calls';
+  const limit = payload.action === 'foto' ? PHOTO_DAILY_LIMIT : CHAT_DAILY_LIMIT;
+  const usage = await getUsage(user.id);
+  if ((usage[bucket] || 0) >= limit) {
+    const label = bucket === 'photo_calls' ? 'de análisis de fotos' : 'de uso de IA';
+    return { statusCode: 429, headers, body: JSON.stringify({ error: `Llegaste al límite diario ${label} (${limit}/día). Probá de nuevo mañana.` }) };
   }
 
   let messages;
@@ -116,6 +168,7 @@ exports.handler = async (event) => {
     if (!textBlock) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Respuesta sin contenido de texto' }) };
     const clean = textBlock.text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
+    await incrementUsage(user.id, bucket, usage);
     return { statusCode: 200, headers, body: JSON.stringify(parsed) };
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Error interno', detail: String(err) }) };
