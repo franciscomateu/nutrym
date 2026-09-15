@@ -627,6 +627,11 @@
       <h3>Apple Health</h3>
       <div id="applehealth-content"></div>
       <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — no hace falta que hagas nada acá.</div>
+      <div class="hint" style="margin-top:8px;">Tu ID para configurar el Atajo (va como valor del header <code>X-Health-Token</code>):</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+        <code id="my-user-id" style="font-size:11px; word-break:break-all; flex:1;"></code>
+        <button type="button" class="btn secondary" id="copy-user-id-btn">Copiar</button>
+      </div>
     </div>
 
     <div class="panel">
@@ -3335,6 +3340,10 @@ async function startApp() {
   if (user) {
     const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email;
     document.getElementById('user-name-label').textContent = name;
+    document.getElementById('my-user-id').textContent = user.id;
+    document.getElementById('copy-user-id-btn').onclick = () => {
+      navigator.clipboard.writeText(user.id).catch(() => {});
+    };
   }
   setSaving('Cargando…');
   await loadAll();
