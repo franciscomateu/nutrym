@@ -83,7 +83,7 @@
 
   .tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
     background: var(--card); border-top: 1px solid var(--card-border);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     box-shadow: 0 -2px 10px rgba(20,24,28,0.06);
@@ -108,12 +108,14 @@
     box-shadow: 0 2px 10px rgba(20,24,28,0.05), 0 1px 2px rgba(20,24,28,0.04);
   }
   .panel h3 { font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 800; margin: 0 0 14px; letter-spacing: -0.01em; }
+  .accordion-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .accordion-body { margin-top: 14px; }
+  .accordion-body h3:first-child { margin-top: 0; }
 
   /* Tinte sutil por categoría — misma estructura de panel, distinta identidad visual según la sección */
   #tab-alimentacion .panel { border-left: 3px solid var(--accent); background: linear-gradient(180deg, var(--accent-soft) 0%, var(--card) 90px); }
   #tab-actividad .panel { border-left: 3px solid var(--slate); background: linear-gradient(180deg, var(--slate-soft) 0%, var(--card) 90px); }
   #tab-historial .panel { border-left: 3px solid var(--gold); background: linear-gradient(180deg, var(--gold-soft) 0%, var(--card) 90px); }
-  #tab-dispositivos .panel { border-left: 3px solid var(--slate); }
   #tab-nutria .panel { border-left: 3px solid var(--gold); }
   #tab-deportes .panel { border-left: 3px solid var(--danger); background: linear-gradient(180deg, var(--danger-soft) 0%, var(--card) 90px); }
   #tab-config .panel { border-left: 3px solid var(--card-border); }
@@ -244,7 +246,7 @@
     </div>
   </div>
 
-  <div class="hero">
+  <div class="hero" id="calorie-hero">
     <div class="hero-label" id="hero-date"></div>
     <div class="daytype-row">
       <label for="daytype-select">Tipo de día</label>
@@ -275,18 +277,18 @@
     </div>
   </div>
 
+  <div class="hero" id="sports-hero" style="display:none;">
+    <div id="sports-hero-content"></div>
+  </div>
+
   <div class="tabs">
     <button class="tab active" data-tab="alimentacion">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V2M9 11v11M15 2c-1.5 1.5-2 3-2 5s.5 3.5 2 5c1.5-1.5 2-3 2-5s-.5-3.5-2-5zM15 13v10"/></svg>
       <span class="tab-label">Alimentación</span>
     </button>
     <button class="tab" data-tab="actividad">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.4 15 9.5l-1.1 3.6H10.1L9 9.5zM12 7.4V4M15 9.5l3-.9M13.4 12.6l1.8 2.8M10.6 12.6l-1.8 2.8M9 9.5l-3-.9"/></svg>
-      <span class="tab-label">Actividad</span>
-    </button>
-    <button class="tab" data-tab="dispositivos">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="16" rx="2"/><path d="M11 18h2"/></svg>
-      <span class="tab-label">Dispositivos</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8v8M4 10v4M9 12h6M18 8v8M20 10v4"/></svg>
+      <span class="tab-label">Gimnasio</span>
     </button>
     <button class="tab" data-tab="deportes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.4 15 9.5l-1.1 3.6H10.1L9 9.5zM12 7.4V4M15 9.5l3-.9M13.4 12.6l1.8 2.8M10.6 12.6l-1.8 2.8M9 9.5l-3-.9"/></svg>
@@ -298,7 +300,7 @@
     </button>
     <button class="tab" data-tab="historial">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
-      <span class="tab-label">Historial</span>
+      <span class="tab-label">Estadísticas</span>
     </button>
     <button class="tab" data-tab="config">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -371,18 +373,8 @@
     </div>
   </section>
 
-  <!-- ACTIVIDAD -->
+  <!-- ACTIVIDAD (ahora solo Gimnasio) -->
   <section id="tab-actividad" class="tabsection" style="display:none;">
-    <div class="subtabs" id="actividad-outer-subtabs">
-      <button class="subtab active" data-actividadtab="gimnasio">Gimnasio</button>
-      <button class="subtab" data-actividadtab="deporte">Deporte</button>
-      <button class="subtab" data-actividadtab="otra">Otra</button>
-    </div>
-    <div id="club-badge-wrap" style="display:none; align-items:center; gap:8px; margin-bottom:12px;">
-      <div id="club-badge" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; font-family:'Manrope',sans-serif;"></div>
-      <span id="club-badge-name" class="entry-meta"></span>
-    </div>
-
     <div id="actividad-gimnasio" class="actividadtabsection">
       <div class="subtabs">
         <button class="subtab active" data-gymtab="registrar">Registrar</button>
@@ -428,6 +420,7 @@
           </div>
           <div class="form-row" style="margin-top:0;">
             <div class="field small"><label>Días por semana</label><input type="number" id="routine-days-count" min="1" max="7" value="4"></div>
+            <div class="field small"><label>Minutos por sesión</label><input type="number" id="routine-minutes" min="15" max="180" value="60"></div>
           </div>
           <div id="routine-day-pickers" style="margin-top:14px;"></div>
           <button class="btn slate" id="generate-routine-btn" style="margin-top:14px;">Generar rutina con esta configuración</button>
@@ -454,108 +447,111 @@
       </div>
     </div>
 
-    <div id="actividad-deporte" class="actividadtabsection" style="display:none;">
-
-      <div class="subtabs">
-        <button class="subtab active" data-deportetab="registrar">Registrar</button>
-        <button class="subtab" data-deportetab="carga">Carga semanal</button>
-        <button class="subtab" data-deportetab="historial">Historial</button>
-      </div>
-
-      <div id="deporte-registrar" class="deportetabsection">
-        <div class="panel">
-          <h3 id="deporte-log-title">Deporte del día</h3>
-          <div id="deporte-log-list"></div>
-          <div id="deporte-day-total"></div>
-          <form id="deporte-form" style="margin-top:14px;">
-            <div class="form-row" style="margin-top:0;">
-              <div class="field grow">
-                <label>Deporte</label>
-                <input type="text" id="deporte-name" list="deporte-list" placeholder="Ej: pádel, fútbol, running">
-                <datalist id="deporte-list"></datalist>
-              </div>
-              <div class="field small">
-                <label>Duración (min)</label>
-                <input type="number" min="0" id="deporte-duration" placeholder="60">
-              </div>
-              <div class="field">
-                <label>Intensidad (RPE)</label>
-                <select id="deporte-rpe">
-                  <option value="1">1 — muy liviano</option>
-                  <option value="2">2</option>
-                  <option value="3">3 — liviano</option>
-                  <option value="4">4</option>
-                  <option value="5">5 — moderado</option>
-                  <option value="6">6</option>
-                  <option value="7" selected>7 — intenso</option>
-                  <option value="8">8</option>
-                  <option value="9">9 — muy intenso</option>
-                  <option value="10">10 — esfuerzo máximo</option>
-                </select>
-              </div>
-            </div>
-            <div class="field grow" style="margin-top:10px;">
-              <label>Nota (opcional)</label>
-              <input type="text" id="deporte-note" placeholder="Ej: ganamos 6-3, sentí bien las piernas">
-            </div>
-            <div id="deporte-stats-container" style="margin-top:10px;"></div>
-            <button type="button" class="linkbtn" id="add-deporte-stat">+ agregar estadística (ej: tries, conversiones)</button>
-            <button type="submit" class="btn" style="margin-top:12px; display:block;">Guardar sesión</button>
-          </form>
-        </div>
-      </div>
-
-      <div id="deporte-carga" class="deportetabsection" style="display:none;">
-        <div class="panel">
-          <h3>Carga semanal (duración × intensidad)</h3>
-          <div id="carga-empty" class="empty">Registrá sesiones de deporte para ver tu carga semanal acá.</div>
-          <div id="carga-content" style="display:none;">
-            <canvas id="chart-carga" height="160"></canvas>
-            <div class="chart-title" style="margin-top:18px;">Esta semana por deporte</div>
-            <div id="carga-breakdown"></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="deporte-historial" class="deportetabsection" style="display:none;">
-        <div class="panel">
-          <h3>Historial por deporte</h3>
-          <div class="field grow" style="margin-bottom:14px;">
-            <label>Deporte</label>
-            <select id="deporte-history-select"><option value="">Elegí un deporte</option></select>
-          </div>
-          <div id="deporte-history-empty" class="empty">Elegí un deporte para ver tu historial de sesiones.</div>
-          <div id="deporte-history-content" style="display:none;"></div>
-        </div>
-      </div>
-    </div>
-
-    <div id="actividad-otra" class="actividadtabsection" style="display:none;">
-      <div class="panel">
-        <h3>Otra actividad</h3>
-        <div class="hint" style="margin-top:0;">Para lo que no es ni gimnasio ni un deporte armado — caminata, pileta libre, etc.</div>
-        <div id="activities-list"></div>
-        <form id="activity-form">
-          <div class="form-row">
-            <div class="field grow"><label>Actividad</label><input type="text" id="act-name" placeholder="Ej: caminata, pileta libre"></div>
-            <div class="field small"><label>Kcal quemadas</label><input type="number" min="0" id="act-cal" placeholder="0"></div>
-            <div class="field small"><label>Min (opc.)</label><input type="number" min="0" id="act-duration"></div>
-            <button type="submit" class="btn">Agregar</button>
-          </div>
-        </form>
-        <div class="hint" id="act-cal-hint" style="margin-top:6px;"></div>
-      </div>
-    </div>
   </section>
 
-  <!-- HISTORIAL -->
+  <!-- DEPORTES -->
   <section id="tab-deportes" class="tabsection" style="display:none;">
     <div class="subtabs" id="sports-subtabs">
       <button class="subtab active" data-sportkey="rugby">Rugby</button>
       <button class="subtab" data-sportkey="futbol">Fútbol</button>
       <button class="subtab" data-sportkey="padel">Pádel</button>
+      <button class="subtab" data-sportkey="actividad">Actividad</button>
     </div>
     <div id="sports-content"></div>
+    <div id="sports-actividad-content" style="display:none;">
+      <div id="actividad-deporte" class="actividadtabsection">
+
+        <div class="subtabs">
+          <button class="subtab active" data-deportetab="registrar">Registrar</button>
+          <button class="subtab" data-deportetab="carga">Carga semanal</button>
+          <button class="subtab" data-deportetab="historial">Historial</button>
+        </div>
+
+        <div id="deporte-registrar" class="deportetabsection">
+          <div class="panel">
+            <h3 id="deporte-log-title">Deporte del día</h3>
+            <div id="deporte-log-list"></div>
+            <div id="deporte-day-total"></div>
+            <form id="deporte-form" style="margin-top:14px;">
+              <div class="form-row" style="margin-top:0;">
+                <div class="field grow">
+                  <label>Deporte</label>
+                  <input type="text" id="deporte-name" list="deporte-list" placeholder="Ej: pádel, fútbol, running">
+                  <datalist id="deporte-list"></datalist>
+                </div>
+                <div class="field small">
+                  <label>Duración (min)</label>
+                  <input type="number" min="0" id="deporte-duration" placeholder="60">
+                </div>
+                <div class="field">
+                  <label>Intensidad (RPE)</label>
+                  <select id="deporte-rpe">
+                    <option value="1">1 — muy liviano</option>
+                    <option value="2">2</option>
+                    <option value="3">3 — liviano</option>
+                    <option value="4">4</option>
+                    <option value="5">5 — moderado</option>
+                    <option value="6">6</option>
+                    <option value="7" selected>7 — intenso</option>
+                    <option value="8">8</option>
+                    <option value="9">9 — muy intenso</option>
+                    <option value="10">10 — esfuerzo máximo</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field grow" style="margin-top:10px;">
+                <label>Nota (opcional)</label>
+                <input type="text" id="deporte-note" placeholder="Ej: ganamos 6-3, sentí bien las piernas">
+              </div>
+              <div id="deporte-stats-container" style="margin-top:10px;"></div>
+              <button type="button" class="linkbtn" id="add-deporte-stat">+ agregar estadística (ej: tries, conversiones)</button>
+              <button type="submit" class="btn" style="margin-top:12px; display:block;">Guardar sesión</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="deporte-carga" class="deportetabsection" style="display:none;">
+          <div class="panel">
+            <h3>Carga semanal (duración × intensidad)</h3>
+            <div id="carga-empty" class="empty">Registrá sesiones de deporte para ver tu carga semanal acá.</div>
+            <div id="carga-content" style="display:none;">
+              <canvas id="chart-carga" height="160"></canvas>
+              <div class="chart-title" style="margin-top:18px;">Esta semana por deporte</div>
+              <div id="carga-breakdown"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="deporte-historial" class="deportetabsection" style="display:none;">
+          <div class="panel">
+            <h3>Historial por deporte</h3>
+            <div class="field grow" style="margin-bottom:14px;">
+              <label>Deporte</label>
+              <select id="deporte-history-select"><option value="">Elegí un deporte</option></select>
+            </div>
+            <div id="deporte-history-empty" class="empty">Elegí un deporte para ver tu historial de sesiones.</div>
+            <div id="deporte-history-content" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="actividad-otra" class="actividadtabsection">
+        <div class="panel">
+          <h3>Otra actividad</h3>
+          <div class="hint" style="margin-top:0;">Para lo que no es ni gimnasio ni un deporte armado — caminata, pileta libre, etc.</div>
+          <div id="activities-list"></div>
+          <form id="activity-form">
+            <div class="form-row">
+              <div class="field grow"><label>Actividad</label><input type="text" id="act-name" placeholder="Ej: caminata, pileta libre"></div>
+              <div class="field small"><label>Kcal quemadas</label><input type="number" min="0" id="act-cal" placeholder="0"></div>
+              <div class="field small"><label>Min (opc.)</label><input type="number" min="0" id="act-duration"></div>
+              <button type="submit" class="btn">Agregar</button>
+            </div>
+          </form>
+          <div class="hint" id="act-cal-hint" style="margin-top:6px;"></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section id="tab-historial" class="tabsection" style="display:none;">
@@ -627,128 +623,113 @@
   </section>
 
   <!-- DISPOSITIVOS -->
-  <section id="tab-dispositivos" class="tabsection" style="display:none;">
-    <div class="panel">
-      <h3>Whoop</h3>
-      <div id="whoop-status"></div>
-      <button class="btn" id="whoop-connect-btn" style="margin-top:10px;">Conectar con Whoop</button>
-      <button class="btn secondary" id="whoop-sync-btn" style="margin-top:10px; display:none;">Sincronizar entrenamientos</button>
-      <button class="linkbtn" id="whoop-disconnect-btn" style="margin-top:12px; display:none;">Desconectar</button>
-      <div class="error-box" id="whoop-error"></div>
-      <div class="hint">Trae tus entrenamientos registrados por el Whoop y los suma como actividad del día correspondiente, para el cálculo de déficit.</div>
-    </div>
-
-    <div class="panel">
-      <h3>Whoop — recovery y sueño de hoy</h3>
-      <div id="whoop-vitals-status"></div>
-      <button type="button" class="btn secondary" id="whoop-vitals-refresh-btn" style="margin-top:10px;">Actualizar</button>
-      <div class="error-box" id="whoop-vitals-error"></div>
-      <div id="whoop-vitals-content" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="panel">
-      <h3>Apple Health</h3>
-      <div id="applehealth-content"></div>
-      <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — no hace falta que hagas nada acá.</div>
-      <div class="hint" style="margin-top:8px;">Tu ID para configurar el Atajo (va como valor del header <code>X-Health-Token</code>):</div>
-      <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-        <code id="my-user-id" style="font-size:11px; word-break:break-all; flex:1;"></code>
-        <button type="button" class="btn secondary" id="copy-user-id-btn">Copiar</button>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3>Otras conexiones</h3>
-      <div class="empty">Por ahora solo Whoop y Apple Health. Cuando conectemos algo más, va a aparecer acá.</div>
-    </div>
-  </section>
-
   <!-- NUTRIA -->
   <section id="tab-nutria" class="tabsection" style="display:none;">
     <div class="panel">
-      <h3>Insights inteligentes</h3>
-      <div class="hint" style="margin-top:0;">Patrones detectados entre tu recovery/sueño (Whoop) y tu rendimiento — solo se muestran cuando hay suficiente evidencia, no una sola coincidencia.</div>
-      <div id="smart-insights-content" style="margin-top:12px;"></div>
-    </div>
-    <div class="panel">
-      <h3>NutrIA</h3>
-      <div class="hint" style="margin-top:0;">Preguntame sobre tu progreso — cuanto más cargues día a día, mejor te voy a poder responder.</div>
-      <div class="form-row" style="margin-top:12px;">
-        <button type="button" class="btn secondary" id="nutria-btn-alimentacion">Alimentación</button>
-        <button type="button" class="btn secondary" id="nutria-btn-gimnasio">Gimnasio</button>
-        <button type="button" class="btn secondary" id="nutria-btn-deporte">Deporte</button>
-        <button type="button" class="btn secondary" id="nutria-btn-general">Todo junto</button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h3 style="margin:0;">NutrIA</h3>
+        <button type="button" id="insights-info-btn" title="Insights inteligentes" style="width:22px; height:22px; border-radius:50%; border:1px solid var(--card-border); background:var(--bg); color:var(--ink-soft); font-size:12px; font-weight:800; font-family:'Manrope',sans-serif; cursor:pointer; line-height:1;">i</button>
       </div>
-      <div class="form-row" style="margin-top:14px;">
-        <div class="field grow"><label>O preguntame algo puntual</label><input type="text" id="nutria-question" placeholder="Ej: ¿voy bien para bajar 3kg este mes?"></div>
-        <button type="button" class="btn" id="nutria-ask-btn">Preguntar</button>
-      </div>
+      <div class="hint" style="margin-top:6px;">Preguntame sobre tu progreso — cuanto más cargues día a día, mejor te voy a poder responder.</div>
+      <div id="nutria-chat" style="margin-top:14px; display:flex; flex-direction:column; gap:10px; max-height:50vh; overflow-y:auto;"></div>
       <div class="error-box" id="nutria-error"></div>
-      <div id="nutria-results" style="margin-top:14px;"></div>
+      <div class="form-row" style="margin-top:14px;">
+        <div class="field grow"><input type="text" id="nutria-question" placeholder="Escribí tu pregunta..."></div>
+        <button type="button" class="btn" id="nutria-ask-btn">Enviar</button>
+      </div>
     </div>
   </section>
 
+  <div id="insights-info-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title">Insights inteligentes</div>
+      <div class="hint" style="margin-top:0;">Patrones detectados entre tu recovery/sueño (Whoop) y tu rendimiento — solo se muestran cuando hay suficiente evidencia, no una sola coincidencia.</div>
+      <div id="smart-insights-content" style="margin-top:12px;"></div>
+      <div style="margin-top:14px;"><button class="btn" id="insights-info-close">Cerrar</button></div>
+    </div>
+  </div>
+
   <!-- CONFIG -->
   <section id="tab-config" class="tabsection" style="display:none;">
-    <div class="panel">
-      <h3>Perfil deportivo</h3>
-      <div class="form-row" style="margin-top:0;">
-        <div class="field">
-          <label>Deporte principal</label>
-          <select id="cfg-sport">
-            <option value="">Sin especificar</option>
-            <option value="futbol">Fútbol</option>
-            <option value="rugby">Rugby</option>
-            <option value="padel">Pádel</option>
-            <option value="tenis">Tenis</option>
-            <option value="running">Running</option>
-            <option value="ciclismo">Ciclismo</option>
-            <option value="gimnasio">Gimnasio / Fitness</option>
-            <option value="otro">Otro</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Club donde jugás/entrenás</label>
-          <input type="text" id="cfg-club-search" placeholder="Buscá tu club (ej: River Plate)">
-          <div id="cfg-club-results" class="club-results"></div>
-          <div class="hint" id="cfg-club-current" style="margin-top:6px;"></div>
+    <div class="panel accordion">
+      <div class="accordion-header" data-accordion="perfil"><h3>Perfil</h3><span class="chevron">›</span></div>
+      <div class="accordion-body" id="accordion-perfil" style="display:none;">
+        <div class="hint" id="cfg-profile-name" style="margin-top:0;"></div>
+        <div class="hint" id="cfg-profile-email"></div>
+      </div>
+    </div>
+
+    <div class="panel accordion">
+      <div class="accordion-header" data-accordion="cuenta"><h3>Cuenta</h3><span class="chevron">›</span></div>
+      <div class="accordion-body" id="accordion-cuenta" style="display:none;">
+        <button type="button" class="btn secondary" id="logout-btn">Cerrar sesión</button>
+        <button type="button" class="btn secondary" id="show-install-guide-btn" style="margin-top:8px;">Cómo instalar la app en tu celular</button>
+        <div class="hint" style="margin-top:12px;">Migración única de tus datos viejos (antes de Supabase):</div>
+        <button type="button" class="btn secondary" id="migrate-btn" style="margin-top:8px;">Migrar datos de JSONBin</button>
+        <div class="error-box" id="migrate-status"></div>
+      </div>
+    </div>
+
+    <div class="panel accordion">
+      <div class="accordion-header" data-accordion="dispositivos"><h3>Dispositivos</h3><span class="chevron">›</span></div>
+      <div class="accordion-body" id="accordion-dispositivos" style="display:none;">
+        <h3>Whoop</h3>
+        <div id="whoop-status"></div>
+        <button class="btn" id="whoop-connect-btn" style="margin-top:10px;">Conectar con Whoop</button>
+        <button class="btn secondary" id="whoop-sync-btn" style="margin-top:10px; display:none;">Sincronizar entrenamientos</button>
+        <button class="linkbtn" id="whoop-disconnect-btn" style="margin-top:12px; display:none;">Desconectar</button>
+        <div class="error-box" id="whoop-error"></div>
+        <div class="hint">Trae tus entrenamientos registrados por el Whoop y los suma como actividad del día correspondiente, para el cálculo de déficit.</div>
+
+        <h3 style="margin-top:20px;">Whoop — recovery y sueño de hoy</h3>
+        <div id="whoop-vitals-status"></div>
+        <button type="button" class="btn secondary" id="whoop-vitals-refresh-btn" style="margin-top:10px;">Actualizar</button>
+        <div class="error-box" id="whoop-vitals-error"></div>
+        <div id="whoop-vitals-content" style="margin-top:12px;"></div>
+
+        <h3 style="margin-top:20px;">Apple Health</h3>
+        <div id="applehealth-content"></div>
+        <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — no hace falta que hagas nada acá.</div>
+        <div class="hint" style="margin-top:8px;">Tu ID para configurar el Atajo (va como valor del header <code>X-Health-Token</code>):</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+          <code id="my-user-id" style="font-size:11px; word-break:break-all; flex:1;"></code>
+          <button type="button" class="btn secondary" id="copy-user-id-btn">Copiar</button>
         </div>
       </div>
     </div>
-    <div class="panel">
-      <h3>Cuenta</h3>
-      <button type="button" class="btn secondary" id="logout-btn">Cerrar sesión</button>
-      <button type="button" class="btn secondary" id="show-install-guide-btn" style="margin-top:8px;">Cómo instalar la app en tu celular</button>
-      <div class="hint" style="margin-top:12px;">Migración única de tus datos viejos (antes de Supabase):</div>
-      <button type="button" class="btn secondary" id="migrate-btn" style="margin-top:8px;">Migrar datos de JSONBin</button>
-      <div class="error-box" id="migrate-status"></div>
-    </div>
-    <div class="panel">
-      <h3>Meta calórica</h3>
-      <div class="form-row" style="margin-top:0;">
-        <div class="field"><label>Sedentario (kcal)</label><input type="number" min="0" id="cfg-tdee-sed"></div>
-        <div class="field"><label>Intermedio (kcal)</label><input type="number" min="0" id="cfg-tdee-int"></div>
-        <div class="field"><label>Activo (kcal)</label><input type="number" min="0" id="cfg-tdee-act"></div>
-        <div class="field"><label>Déficit diario objetivo (kcal)</label><input type="number" id="cfg-deficit"></div>
+
+    <div class="panel accordion">
+      <div class="accordion-header" data-accordion="metas"><h3>Metas</h3><span class="chevron">›</span></div>
+      <div class="accordion-body" id="accordion-metas" style="display:none;">
+        <div class="form-row" style="margin-top:0;">
+          <div class="field"><label>Sedentario (kcal)</label><input type="number" min="0" id="cfg-tdee-sed"></div>
+          <div class="field"><label>Intermedio (kcal)</label><input type="number" min="0" id="cfg-tdee-int"></div>
+          <div class="field"><label>Activo (kcal)</label><input type="number" min="0" id="cfg-tdee-act"></div>
+          <div class="field"><label>Déficit diario objetivo (kcal)</label><input type="number" id="cfg-deficit"></div>
+        </div>
+        <button class="btn" id="save-settings" style="margin-top:12px;">Guardar</button>
+        <div class="hint" id="cfg-hint"></div>
       </div>
-      <button class="btn" id="save-settings" style="margin-top:12px;">Guardar</button>
-      <div class="hint" id="cfg-hint"></div>
     </div>
 
-    <div class="panel">
-      <h3>Datos para composición corporal</h3>
-      <div class="field"><label>Altura (cm)</label><input type="number" min="0" id="cfg-height"></div>
-      <button class="btn" id="save-height" style="margin-top:12px;">Guardar</button>
-      <div class="hint">Se usa para estimar tu % de grasa corporal con la fórmula de la Marina de EE.UU. a partir de cuello y cintura.</div>
+    <div class="panel accordion">
+      <div class="accordion-header" data-accordion="composicion"><h3>Composición corporal</h3><span class="chevron">›</span></div>
+      <div class="accordion-body" id="accordion-composicion" style="display:none;">
+        <div class="field"><label>Altura (cm)</label><input type="number" min="0" id="cfg-height"></div>
+        <button class="btn" id="save-height" style="margin-top:12px;">Guardar</button>
+        <div class="hint">Se usa para estimar tu % de grasa corporal con la fórmula de la Marina de EE.UU. a partir de cuello y cintura.</div>
+      </div>
     </div>
 
-    <div class="panel">
-      <h3>Notificaciones diarias</h3>
-      <div id="push-status"></div>
-      <button class="btn" id="push-enable-btn" style="margin-top:10px;">Activar notificaciones</button>
-      <button class="btn secondary" id="push-disable-btn" style="margin-top:10px; display:none;">Desactivar</button>
-      <div class="error-box" id="push-error"></div>
-      <div class="hint">Todos los días a las 23:59 te mandamos un resumen de cómo te fue (comida, entrenamiento, y recuperación/sueño si tenés Whoop conectado con esos permisos) y una recomendación para mañana.</div>
+    <div class="panel accordion">
+      <div class="accordion-header" data-accordion="notificaciones"><h3>Notificaciones diarias</h3><span class="chevron">›</span></div>
+      <div class="accordion-body" id="accordion-notificaciones" style="display:none;">
+        <div id="push-status"></div>
+        <button class="btn" id="push-enable-btn" style="margin-top:10px;">Activar notificaciones</button>
+        <button class="btn secondary" id="push-disable-btn" style="margin-top:10px; display:none;">Desactivar</button>
+        <div class="error-box" id="push-error"></div>
+        <div class="hint">Todos los días a las 23:59 te mandamos un resumen de cómo te fue (comida, entrenamiento, y recuperación/sueño si tenés Whoop conectado con esos permisos) y una recomendación para mañana.</div>
+      </div>
     </div>
   </section>
 
@@ -1167,6 +1148,7 @@ async function loadAll() {
   if (state.gym.whoopVitals === undefined) state.gym.whoopVitals = null;
   if (!state.gym.whoopImportedIds) state.gym.whoopImportedIds = [];
   if (!state.gym.whoopHistory) state.gym.whoopHistory = {};
+  if (!state.gym.whoopWorkoutPool) state.gym.whoopWorkoutPool = [];
 
   // Fotos de progreso
   const localPhotosPending = localStorage.getItem(pendingKey('photos')) === '1';
@@ -1185,6 +1167,7 @@ async function loadAll() {
   }
   if (!state.photos.photos) state.photos.photos = {};
   if (!state.photos.foodPhotos) state.photos.foodPhotos = {};
+  if (!state.photos.sportPhotos) state.photos.sportPhotos = {};
 
   // Perfil deportivo
   const localSportsPending = localStorage.getItem(pendingKey('sports')) === '1';
@@ -2199,7 +2182,6 @@ function renderConfig() {
   document.getElementById('cfg-tdee-act').value = state.nutrition.settings.tdeeActivo;
   document.getElementById('cfg-deficit').value = state.nutrition.settings.deficitGoal;
   document.getElementById('cfg-height').value = state.nutrition.settings.heightCm || '';
-  document.getElementById('cfg-sport').value = state.nutrition.settings.sport || '';
   updateConfigHint();
 }
 function updateConfigHint() {
@@ -2232,8 +2214,9 @@ function renderAll() {
   renderDeporteLog();
   renderCarga();
   renderConfig();
-  renderClubBadge();
+  renderNutriaChat();
   renderSportSection();
+  updateHeroVisibility();
   renderProfilePhoto();
   renderWhoopStatus();
   renderWhoopVitalsStatus();
@@ -2334,6 +2317,14 @@ async function whoopSync() {
       const kcal = r.score.kilojoule != null ? Math.round(r.score.kilojoule / 4.184) : 0;
       addActivity(dateStr, { name: 'Entrenamiento Whoop (tipo #' + r.sport_id + ')', calories: kcal, duration: durationMin, source: 'whoop' });
       state.gym.whoopImportedIds.push(r.id);
+      if (!state.gym.whoopWorkoutPool) state.gym.whoopWorkoutPool = [];
+      state.gym.whoopWorkoutPool.unshift({
+        id: r.id, date: dateStr, durationMin, kcal,
+        strain: r.score.strain != null ? Math.round(r.score.strain * 10) / 10 : null,
+        avgHr: r.score.average_heart_rate || null,
+        maxHr: r.score.max_heart_rate || null
+      });
+      state.gym.whoopWorkoutPool = state.gym.whoopWorkoutPool.slice(0, 30);
       imported++;
     });
     await persistGym();
@@ -2558,19 +2549,40 @@ function nutriaContextFor(category) {
   const patternsLine = patterns.length ? ' | PATRONES DETECTADOS: ' + patterns.map(p => p.texto).join(' ') : '';
   return 'ALIMENTACIÓN: ' + nutriaContextFor('alimentacion') + ' | GIMNASIO: ' + nutriaContextFor('gimnasio') + ' | DEPORTE: ' + nutriaContextFor('deporte') + patternsLine;
 }
-async function askNutria(category, question) {
-  const resultsBox = document.getElementById('nutria-results');
+let nutriaHistory = [];
+function renderNutriaChat() {
+  const chat = document.getElementById('nutria-chat');
+  if (!nutriaHistory.length) {
+    chat.innerHTML = '<div class="empty">Preguntame lo que quieras sobre tu progreso.</div>';
+    return;
+  }
+  chat.innerHTML = nutriaHistory.map(m => `
+    <div style="align-self:${m.role === 'user' ? 'flex-end' : 'flex-start'}; max-width:85%;">
+      <div class="${m.role === 'user' ? 'coach-note' : 'coach-note'}" style="${m.role === 'user' ? 'background:var(--accent-soft);' : ''}">${escapeHtml(m.content)}</div>
+    </div>`).join('');
+  chat.scrollTop = chat.scrollHeight;
+}
+async function askNutria(question) {
   const errorBox = document.getElementById('nutria-error');
   errorBox.classList.remove('show');
-  resultsBox.innerHTML = '<div class="empty">Pensando…</div>';
-  const context = nutriaContextFor(category);
+  nutriaHistory.push({ role: 'user', content: question });
+  renderNutriaChat();
+  const chat = document.getElementById('nutria-chat');
+  chat.insertAdjacentHTML('beforeend', '<div class="empty" id="nutria-thinking">Pensando…</div>');
+  chat.scrollTop = chat.scrollHeight;
+  const context = nutriaContextFor('general');
   try {
-    const parsed = await callAiFunction({ action: 'nutria', category, question: question || null, context });
-    resultsBox.innerHTML = `<div class="coach-note">${escapeHtml(parsed.answer || '')}</div>`;
+    const parsed = await callAiFunction({
+      action: 'nutria', category: 'general', question, context,
+      history: nutriaHistory.slice(0, -1).slice(-10)
+    });
+    nutriaHistory.push({ role: 'assistant', content: parsed.answer || '' });
+    renderNutriaChat();
   } catch (err) {
     errorBox.textContent = 'No se pudo generar el análisis. Probá de nuevo en unos minutos.';
     errorBox.classList.add('show');
-    resultsBox.innerHTML = '';
+    nutriaHistory.pop();
+    renderNutriaChat();
   }
 }
 
@@ -2886,9 +2898,10 @@ async function generateRoutine() {
     .concat(state.gym.currentRoutine ? [state.gym.currentRoutine.splitName] : []).join(', ') || 'ninguna';
   const { deficitGoal } = state.nutrition.settings;
   const goalPhrase = deficitGoal >= 0 ? `déficit de ${deficitGoal} kcal/día` : `superávit de ${Math.abs(deficitGoal)} kcal/día`;
+  const minutesPerSession = Math.max(15, Number(document.getElementById('routine-minutes').value) || 60);
 
   try {
-    const parsed = await callAiFunction({ action: 'rutina', plan, recentSummary, previousSplits, goalPhrase });
+    const parsed = await callAiFunction({ action: 'rutina', plan, recentSummary, previousSplits, goalPhrase, minutesPerSession });
     if (!parsed.days || !parsed.days.length) throw new Error('formato inválido');
     applyNewRoutine({ splitName: parsed.splitName || plan.map(p => p.focus).join(' / '), days: parsed.days, coachNote: parsed.coachNote || '' });
   } catch (err) {
@@ -3079,21 +3092,35 @@ function wireEvents() {
     btn.onclick = () => {
       currentSportKey = btn.dataset.sportkey;
       document.querySelectorAll('#sports-subtabs .subtab').forEach(b => b.classList.toggle('active', b === btn));
-      renderSportSection();
+      if (currentSportKey === 'actividad') {
+        document.getElementById('sports-content').style.display = 'none';
+        document.getElementById('sports-actividad-content').style.display = 'block';
+      } else {
+        document.getElementById('sports-actividad-content').style.display = 'none';
+        document.getElementById('sports-content').style.display = 'block';
+        renderSportSection();
+      }
+      updateHeroVisibility();
     };
-  });
-  wireClubSearch('cfg-club-search', 'cfg-club-results', (team) => {
-    state.nutrition.settings.club = { name: team.name, badgeUrl: team.badgeUrl };
-    persistNutrition();
-    renderClubBadge();
   });
   wireClubSearch('wizard-club-search', 'wizard-club-results', (team) => {
     wizardSelectedClub = { name: team.name, badgeUrl: team.badgeUrl };
     document.getElementById('wizard-club-selected').textContent = 'Elegiste: ' + team.name;
   });
-  document.getElementById('cfg-sport').onchange = () => {
-    state.nutrition.settings.sport = document.getElementById('cfg-sport').value;
-    persistNutrition();
+  document.querySelectorAll('.accordion-header').forEach(header => {
+    header.onclick = () => {
+      const body = document.getElementById('accordion-' + header.dataset.accordion);
+      const chevron = header.querySelector('.chevron');
+      const open = body.style.display === 'block';
+      body.style.display = open ? 'none' : 'block';
+      if (chevron) chevron.classList.toggle('open', !open);
+    };
+  });
+  document.getElementById('insights-info-btn').onclick = () => {
+    document.getElementById('insights-info-overlay').style.display = 'flex';
+  };
+  document.getElementById('insights-info-close').onclick = () => {
+    document.getElementById('insights-info-overlay').style.display = 'none';
   };
   document.getElementById('show-install-guide-btn').onclick = showInstallGuide;
   document.getElementById('install-guide-close').onclick = () => {
@@ -3125,14 +3152,7 @@ function wireEvents() {
         renderWhoopVitalsStatus();
         renderAppleHealth();
       }
-    };
-  });
-  document.querySelectorAll('#actividad-outer-subtabs .subtab').forEach(btn => {
-    btn.onclick = () => {
-      activeActividadTab = btn.dataset.actividadtab;
-      document.querySelectorAll('#actividad-outer-subtabs .subtab').forEach(b => b.classList.toggle('active', b === btn));
-      document.querySelectorAll('.actividadtabsection').forEach(s => s.style.display = 'none');
-      document.getElementById('actividad-' + activeActividadTab).style.display = 'block';
+      updateHeroVisibility();
     };
   });
   document.querySelectorAll('#actividad-gimnasio .subtab').forEach(btn => {
@@ -3414,14 +3434,16 @@ function wireEvents() {
   };
   document.getElementById('push-enable-btn').onclick = enablePushNotifications;
   document.getElementById('push-disable-btn').onclick = disablePushNotifications;
-  document.getElementById('nutria-btn-alimentacion').onclick = () => askNutria('alimentacion');
-  document.getElementById('nutria-btn-gimnasio').onclick = () => askNutria('gimnasio');
-  document.getElementById('nutria-btn-deporte').onclick = () => askNutria('deporte');
-  document.getElementById('nutria-btn-general').onclick = () => askNutria('general');
-  document.getElementById('nutria-ask-btn').onclick = () => {
-    const q = document.getElementById('nutria-question').value.trim();
+  const nutriaSend = () => {
+    const input = document.getElementById('nutria-question');
+    const q = input.value.trim();
     if (!q) return;
-    askNutria('general', q);
+    input.value = '';
+    askNutria(q);
+  };
+  document.getElementById('nutria-ask-btn').onclick = nutriaSend;
+  document.getElementById('nutria-question').onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); nutriaSend(); }
   };
   document.getElementById('summary-modal-close').onclick = () => {
     document.getElementById('summary-modal-overlay').style.display = 'none';
@@ -3527,30 +3549,6 @@ function wireClubSearch(inputId, resultsId, onSelect) {
     }, 400);
   };
 }
-function renderClubBadge() {
-  const club = state.nutrition.settings.club;
-  const wrap = document.getElementById('club-badge-wrap');
-  const cfgCurrent = document.getElementById('cfg-club-current');
-  if (!club || !club.name) {
-    wrap.style.display = 'none';
-    if (cfgCurrent) cfgCurrent.textContent = '';
-    return;
-  }
-  const badge = document.getElementById('club-badge');
-  if (club.badgeUrl) {
-    badge.style.background = 'transparent';
-    badge.innerHTML = `<img src="${club.badgeUrl}" style="width:100%; height:100%; object-fit:contain;">`;
-  } else {
-    const initials = club.name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 3).toUpperCase();
-    badge.style.background = '#9AA1A8';
-    badge.style.color = '#fff';
-    badge.innerHTML = initials;
-  }
-  document.getElementById('club-badge-name').textContent = club.name;
-  wrap.style.display = 'flex';
-  if (cfgCurrent) cfgCurrent.textContent = 'Club actual: ' + club.name;
-}
-
 /* ====================== GUÍA DE INSTALACIÓN ====================== */
 function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -3669,6 +3667,24 @@ let currentSportKey = 'rugby';
 let sportMatchSelectedClub = null;
 let sportProfileSelectedClub = null;
 
+function whoopLinkFieldHtml(id) {
+  const pool = state.gym.whoopWorkoutPool || [];
+  if (!pool.length) return '';
+  return `<div class="field" style="margin-top:10px;">
+    <label>Vincular con Whoop (opcional)</label>
+    <select id="${id}">
+      <option value="">Sin vincular</option>
+      ${pool.map((w, i) => `<option value="${i}">${fmtLabel(w.date)} · ${w.durationMin}min · ${w.kcal}kcal${w.strain != null ? ' · strain ' + w.strain : ''}</option>`).join('')}
+    </select>
+  </div>`;
+}
+function getWhoopLinkData(id) {
+  const el = document.getElementById(id);
+  if (!el || el.value === '') return null;
+  const pool = state.gym.whoopWorkoutPool || [];
+  return pool[Number(el.value)] || null;
+}
+
 function sportProfile(key) { return (state.sports.profiles && state.sports.profiles[key]) || {}; }
 function sportMatches(key) { return (state.sports.matches && state.sports.matches[key]) || []; }
 function sportTrainings(key) { return (state.sports.trainings && state.sports.trainings[key]) || []; }
@@ -3692,7 +3708,57 @@ function computeSportStats(key) {
   return { record, streak, streakResult, avgRating, statSums, totalMatches: matches.length };
 }
 
+function computeForm(matches) {
+  return [...matches].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
+    .map(m => m.result === 'ganado' ? 'G' : m.result === 'perdido' ? 'P' : 'E');
+}
+function updateHeroVisibility() {
+  const onSports = activeTab === 'deportes' && currentSportKey !== 'actividad';
+  document.getElementById('calorie-hero').style.display = onSports ? 'none' : '';
+  document.getElementById('sports-hero').style.display = onSports ? 'block' : 'none';
+  if (onSports) renderSportsHero();
+}
+function renderSportsHero() {
+  const tpl = SPORT_TEMPLATES[currentSportKey];
+  const profile = sportProfile(currentSportKey);
+  const stats = computeSportStats(currentSportKey);
+  const form = computeForm(sportMatches(currentSportKey));
+  const photo = state.photos.sportPhotos && state.photos.sportPhotos[currentSportKey];
+  const content = document.getElementById('sports-hero-content');
+  const formColors = { G: 'rgba(31,111,74,0.55)', P: 'rgba(155,44,59,0.55)', E: 'rgba(184,137,43,0.55)' };
+  content.innerHTML = `
+    <div style="display:flex; gap:14px; align-items:center;">
+      <div style="width:64px; height:64px; border-radius:50%; overflow:hidden; background:rgba(255,255,255,0.08); flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+        ${photo ? `<img src="${photo.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:10px; color:#8B939A; text-align:center;">Sin foto</span>`}
+      </div>
+      <div>
+        <div style="font-family:'Manrope',sans-serif; font-weight:800; font-size:19px; color:var(--bg);">${tpl.label}</div>
+        <div style="font-size:12px; color:#9BA3AA; margin-top:2px;">${profile.position ? escapeHtml(profile.position) + ' · ' : ''}${profile.level || 'amateur'}</div>
+        <button type="button" class="linkbtn" id="sports-hero-photo-btn" style="margin-top:4px; color:#9BA3AA; font-size:11px;">${photo ? 'Cambiar foto' : 'Subir foto'}</button>
+      </div>
+    </div>
+    <input type="file" accept="image/*" id="sports-hero-photo-input" style="display:none;">
+    ${form.length ? `<div style="margin-top:16px; display:flex; gap:6px;">
+      ${form.map(r => `<div style="width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; font-family:'Manrope',sans-serif; background:${formColors[r]}; color:#fff;">${r}</div>`).join('')}
+    </div>` : ''}
+    <div class="hero-breakdown">
+      <div class="hero-breakdown-item"><div class="stat-label">Partidos</div><div class="stat-value">${stats.totalMatches}</div></div>
+      <div class="hero-breakdown-item"><div class="stat-label">Entrenamientos</div><div class="stat-value">${sportTrainings(currentSportKey).length}</div></div>
+      <div class="hero-breakdown-item"><div class="stat-label">Récord</div><div class="stat-value" style="font-size:15px;">${stats.record.g}G-${stats.record.e}E-${stats.record.p}P</div></div>
+    </div>`;
+  document.getElementById('sports-hero-photo-btn').onclick = () => document.getElementById('sports-hero-photo-input').click();
+  document.getElementById('sports-hero-photo-input').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const dataUrl = await compressImageFile(file, 480);
+    if (!state.photos.sportPhotos) state.photos.sportPhotos = {};
+    state.photos.sportPhotos[currentSportKey] = { image: dataUrl, savedAt: new Date().toISOString() };
+    persistPhotos();
+    renderSportsHero();
+  };
+}
 function renderSportSection() {
+  if (currentSportKey === 'actividad') return;
   const tpl = SPORT_TEMPLATES[currentSportKey];
   const profile = sportProfile(currentSportKey);
   const stats = computeSportStats(currentSportKey);
@@ -3753,6 +3819,7 @@ function renderSportSection() {
         </div>
       </div>
       <div class="field" style="margin-top:10px;"><label>Foco del entrenamiento</label><input type="text" id="training-focus" placeholder="Ej: scrum y contacto"></div>
+      ${whoopLinkFieldHtml('training-whoop-link')}
       <button type="button" class="btn secondary" id="training-add-btn" style="margin-top:10px;">Agregar entrenamiento</button>
     </div>
     <div class="panel">
@@ -3762,6 +3829,7 @@ function renderSportSection() {
           <div>
             <div class="entry-name">${fmtLabel(t.date)} · RPE ${t.rpe} · ${escapeHtml(t.feeling)}</div>
             ${t.focus ? `<div class="entry-meta">${escapeHtml(t.focus)}</div>` : ''}
+            ${t.whoopData ? `<div class="entry-meta">Whoop: ${t.whoopData.durationMin}min · ${t.whoopData.kcal}kcal${t.whoopData.strain != null ? ' · strain ' + t.whoopData.strain : ''}</div>` : ''}
           </div>
           <button class="del" data-remove-training="${t.id}">✕</button>
         </div>`).join('') : '<div class="empty">Sin entrenamientos cargados todavía.</div>'}
@@ -3797,6 +3865,7 @@ function renderSportSection() {
     ${(tpl.matchStats || []).length ? `<div class="form-row" style="margin-top:10px;">
       ${tpl.matchStats.map(st => `<div class="field"><label>${escapeHtml(st.label)}</label><input type="${st.type === 'number' ? 'number' : 'text'}" id="match-stat-${st.key}"></div>`).join('')}
     </div>` : ''}
+    ${whoopLinkFieldHtml('match-whoop-link')}
     <button type="button" class="btn" id="match-add-btn" style="margin-top:12px;">Agregar partido</button>
   </div>
   <div class="panel">
@@ -3806,6 +3875,7 @@ function renderSportSection() {
         <div>
           <div class="entry-name">${fmtLabel(m.date)} vs ${escapeHtml(m.opponent || '—')} · <span style="color:${m.result === 'ganado' ? 'var(--accent)' : m.result === 'perdido' ? 'var(--danger)' : 'var(--gold)'};">${m.result}</span></div>
           <div class="entry-meta">${m.score ? m.score + ' · ' : ''}Autoevaluación ${m.selfRating}/10${m.position ? ' · ' + escapeHtml(m.position) : ''}${m.club ? ' · ' + escapeHtml(m.club.name) : ''}${m.team ? ' · ' + escapeHtml(m.team) : ''}</div>
+          ${m.whoopData ? `<div class="entry-meta">Whoop: ${m.whoopData.durationMin}min · ${m.whoopData.kcal}kcal${m.whoopData.strain != null ? ' · strain ' + m.whoopData.strain : ''}</div>` : ''}
           ${m.stats && Object.keys(m.stats).length ? `<div class="entry-meta">${Object.entries(m.stats).map(([k, v]) => (tpl.matchStats.find(s => s.key === k) || {}).label + ': ' + v).join(' · ')}</div>` : ''}
         </div>
         <button class="del" data-remove-match="${m.id}">✕</button>
@@ -3839,12 +3909,14 @@ function wireSportSectionEvents(tpl) {
   if (tpl.hasTrainings) {
     document.getElementById('training-add-btn').onclick = () => {
       if (!state.sports.trainings[currentSportKey]) state.sports.trainings[currentSportKey] = [];
+      const whoopData = getWhoopLinkData('training-whoop-link');
       state.sports.trainings[currentSportKey].push({
         id: uid(),
         date: document.getElementById('training-date').value || todayStr(),
         rpe: Number(document.getElementById('training-rpe').value) || null,
         feeling: document.getElementById('training-feeling').value,
-        focus: document.getElementById('training-focus').value.trim()
+        focus: document.getElementById('training-focus').value.trim(),
+        whoopData
       });
       persistSports();
       renderSportSection();
@@ -3880,7 +3952,8 @@ function wireSportSectionEvents(tpl) {
       result: document.getElementById('match-result').value,
       score: document.getElementById('match-score').value.trim(),
       selfRating: Number(document.getElementById('match-rating').value) || null,
-      stats
+      stats,
+      whoopData: getWhoopLinkData('match-whoop-link')
     };
     if (tpl.positions) match.position = document.getElementById('match-position').value;
     if (extra.includes('equipo')) match.team = document.getElementById('match-team').value.trim();
@@ -3928,6 +4001,8 @@ async function startApp() {
   if (user) {
     const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email;
     document.getElementById('user-name-label').textContent = name;
+    document.getElementById('cfg-profile-name').textContent = 'Nombre: ' + name;
+    document.getElementById('cfg-profile-email').textContent = 'Email: ' + (user.email || '—');
     document.getElementById('my-user-id').textContent = user.id;
     document.getElementById('copy-user-id-btn').onclick = () => {
       navigator.clipboard.writeText(user.id).catch(() => {});

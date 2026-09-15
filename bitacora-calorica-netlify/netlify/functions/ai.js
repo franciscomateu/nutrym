@@ -124,27 +124,31 @@ exports.handler = async (event) => {
     messages = [{ role: 'user', content: prompt }];
   } else if (payload.action === 'rutina') {
     const planText = (payload.plan || []).map(p => p.day + ': ' + p.focus).join(' | ') || 'sin plan (usar full body genérico)';
+    const minutes = Number(payload.minutesPerSession) || 60;
+    const exerciseRange = minutes <= 30 ? '2 a 3' : minutes <= 45 ? '3 a 4' : minutes <= 75 ? '4 a 6' : '6 a 8';
     const prompt = 'Sos un entrenador de fuerza. El usuario ya decidió su propio split semanal — vos SOLO tenés que completar los ejercicios de cada día, respetando EXACTAMENTE ese plan (mismos días, mismo foco muscular por día, mismo orden). '
       + 'Plan del usuario: ' + planText + '. '
+      + 'Tiene ' + minutes + ' minutos disponibles por sesión — ajustá la cantidad de ejercicios y series para que la sesión completa (calentamiento breve + ejercicios + descansos típicos) entre cómodamente en ese tiempo, sin que quede apurado ni le sobre demasiado tiempo. '
       + 'Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown) con esta forma: '
       + '{"splitName": "nombre corto que resuma el split del usuario", "days": [{"day": "Día 1", "focus": "el mismo foco que te pasé para ese día", "exercises": [{"name": "ejercicio", "sets": numero, "reps": "rango de reps ej 8-10", "note": "tip breve opcional"}]}], "coachNote": "1-2 frases breves con foco de la semana"}. '
-      + 'Reglas: 4 a 6 ejercicios por día, TODOS coherentes con el foco muscular de ESE día específico — no mezcles grupos musculares que no correspondan a ese día (ej: si el foco es "Piernas", nada de pecho o espalda ese día). Variedad realista de gimnasio. '
+      + 'Reglas: ' + exerciseRange + ' ejercicios por día según el tiempo disponible, TODOS coherentes con el foco muscular de ESE día específico — no mezcles grupos musculares que no correspondan a ese día (ej: si el foco es "Piernas", nada de pecho o espalda ese día). Variedad realista de gimnasio. '
       + 'Los últimos entrenamientos registrados fueron: ' + (payload.recentSummary || 'sin datos') + '. '
       + 'Los splits de semanas anteriores fueron: ' + (payload.previousSplits || 'ninguna') + '; para dar variedad, evitá repetir los mismos ejercicios exactos de esas semanas cuando el foco lo permita. '
       + 'La persona está en un objetivo calórico de ' + (payload.goalPhrase || 'mantenimiento') + ', considerá eso en el coachNote (recuperación, intensidad). '
       + 'Respondé SOLO el JSON.';
     messages = [{ role: 'user', content: prompt }];
   } else if (payload.action === 'nutria') {
-    const catLabels = { alimentacion: 'alimentación', gimnasio: 'gimnasio', deporte: 'deporte', general: 'general (todos los datos)' };
-    const catLabel = catLabels[payload.category] || 'general';
-    const prompt = 'Sos un coach personal de nutrición y entrenamiento, cercano y directo, que le habla de vos a un usuario argentino. '
-      + 'Te paso un resumen real de sus datos de ' + catLabel + ': ' + (payload.context || 'sin datos') + '. '
-      + (payload.question
-        ? 'El usuario pregunta puntualmente: "' + payload.question + '". Respondé eso específicamente, basándote en los datos. '
-        : 'Dale un análisis breve de cómo viene, qué está funcionando y qué podría ajustar. ')
-      + 'Basate SOLO en los datos que te pasé, no inventes números. Si los datos son escasos o insuficientes para responder bien, decilo con honestidad y sugerí qué cargar para tener un análisis mejor la próxima vez. '
-      + 'Máximo 2-3 oraciones cortas, sin relleno, tono cercano de entrenador que conoce a la persona. Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"answer": "tu respuesta"}. Respondé SOLO el JSON.';
-    messages = [{ role: 'user', content: prompt }];
+    const preamble = 'Sos un coach personal de nutrición y entrenamiento, cercano y directo, que le habla de vos a un usuario argentino. '
+      + 'Datos reales de su progreso (alimentación, gimnasio y deporte): ' + (payload.context || 'sin datos') + '. '
+      + 'Basate SOLO en estos datos, no inventes números. Si son escasos para responder bien, decilo con honestidad y sugerí qué cargar.';
+    const history = Array.isArray(payload.history) ? payload.history.slice(-10) : [];
+    messages = [
+      { role: 'user', content: preamble },
+      { role: 'assistant', content: 'Dale, te leo.' },
+      ...history.map(h => ({ role: h.role === 'assistant' ? 'assistant' : 'user', content: h.content })),
+      { role: 'user', content: (payload.question || 'Dame un análisis breve de cómo vengo.')
+        + '\n\nMáximo 2-3 oraciones cortas, sin relleno, tono cercano de entrenador que conoce a la persona. Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"answer": "tu respuesta"}. Respondé SOLO el JSON.' }
+    ];
   } else {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Acción desconocida' }) };
   }
