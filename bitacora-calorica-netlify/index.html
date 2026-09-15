@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
     --bg: #F1F0EC;
@@ -203,7 +204,18 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div id="login-gate" style="position:fixed; inset:0; z-index:200; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; text-align:center;">
+  <img src="/icons/icon-192.png" style="width:72px; height:72px; border-radius:18px;">
+  <div style="font-family:'Manrope',sans-serif; font-size:22px; font-weight:800; color:var(--ink);">Nutrym</div>
+  <div style="font-size:14px; color:var(--ink-soft); max-width:280px;">Iniciá sesión para acceder a tu bitácora.</div>
+  <button type="button" class="btn" id="login-google-btn" style="display:flex; align-items:center; justify-content:center; gap:10px;">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.4-1.9 14.3-5.1l-6.6-5.6C29.6 35 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.6 5.6C41.9 35.9 44 30.3 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+    Continuar con Google
+  </button>
+  <div class="error-box" id="login-error"></div>
+</div>
+<div class="wrap" id="app-wrap" style="display:none;">
+
 
   <div class="header">
     <div style="display:flex; align-items:center; gap:12px;">
@@ -650,6 +662,13 @@
   <!-- CONFIG -->
   <section id="tab-config" class="tabsection" style="display:none;">
     <div class="panel">
+      <h3>Cuenta</h3>
+      <button type="button" class="btn secondary" id="logout-btn">Cerrar sesión</button>
+      <div class="hint" style="margin-top:12px;">Migración única de tus datos viejos (antes de Supabase):</div>
+      <button type="button" class="btn secondary" id="migrate-btn" style="margin-top:8px;">Migrar datos de JSONBin</button>
+      <div class="error-box" id="migrate-status"></div>
+    </div>
+    <div class="panel">
       <h3>Meta calórica</h3>
       <div class="form-row" style="margin-top:0;">
         <div class="field"><label>Sedentario (kcal)</label><input type="number" min="0" id="cfg-tdee-sed"></div>
@@ -745,10 +764,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 /* ====================== CONFIG ====================== */
-const JSONBIN_MASTER_KEY = '$2a$10$k.R5Udtn8mYhhnrwn9mPcOpEg/eo937TGhFk48UdrUQx9BRxzfh0W';
-const NUTRITION_BIN_ID = '6aa157a0ffd5d16053f1a727';
-const GYM_BIN_ID = '6aa157afac6210605ab8076a';
-const PHOTOS_BIN_ID = '6aa44f42ffd5d16053fb7201';
+const SUPABASE_URL = 'https://yaxagdhyjthobgvnmfzu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlheGFnZGh5anRob2Jndm5tZnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0MjkxMzAsImV4cCI6MjEwNTAwNTEzMH0.nGunpnUK46-iSSW-5x5CeTGz5_VpZbH-Npa_ZVEosro';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const APP_TOKEN = '2ENJpWQa7ySYjuD8vAtErT34bIfv32J7'; // debe coincidir con la variable de entorno APP_TOKEN en Netlify
 const WHOOP_CLIENT_ID = '58561d32-d94f-4654-8b76-106f5ae2d6a4';
 const WHOOP_REDIRECT_URI = 'https://nutrym.netlify.app/';
@@ -846,51 +864,51 @@ function showGlobalError(msg) {
   setTimeout(() => box.classList.remove('show'), 6000);
 }
 
-/* ====================== PERSISTENCIA: JSONBin + cache local + cola offline ====================== */
-async function jsonbinGet(binId) {
+/* ====================== PERSISTENCIA: Supabase + cache local + cola offline ====================== */
+async function jsonbinGet(domain) {
+  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+  if (userErr || !userData.user) { const err = new Error('Sin sesión activa'); err.status = 401; throw err; }
   let res;
   try {
-    res = await fetch(JSONBIN_BASE + binId + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-    });
+    res = await supabaseClient
+      .from('user_data')
+      .select('data')
+      .eq('user_id', userData.user.id)
+      .eq('domain', domain)
+      .maybeSingle();
   } catch (networkErr) {
-    const err = new Error('No se pudo contactar a JSONBin: ' + networkErr.message);
+    const err = new Error('No se pudo contactar a Supabase: ' + networkErr.message);
     err.networkFailure = true;
     throw err;
   }
-  if (!res.ok) {
-    let detail = '';
-    try { detail = (await res.json()).error || ''; } catch (e) {}
-    const err = new Error('jsonbin get ' + res.status + (detail ? ': ' + detail : ''));
-    err.status = res.status;
+  if (res.error) {
+    const err = new Error('supabase get ' + domain + ': ' + res.error.message);
+    err.status = 500;
     throw err;
   }
-  const data = await res.json();
-  return data.record;
+  return res.data ? res.data.data : {};
 }
 function syncMessageFor(e) {
   if (e && e.networkFailure) return 'No se pudo conectar con el servidor — guardando local';
-  if (e && (e.status === 403 || e.status === 429)) return 'Límite diario de JSONBin alcanzado';
+  if (e && e.status === 401) return 'Sesión vencida — volvé a iniciar sesión';
   return 'No se pudo guardar — reintenta solo';
 }
-async function jsonbinPut(binId, record) {
+async function jsonbinPut(domain, record) {
+  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+  if (userErr || !userData.user) { const err = new Error('Sin sesión activa'); err.status = 401; throw err; }
   let res;
   try {
-    res = await fetch(JSONBIN_BASE + binId, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_MASTER_KEY },
-      body: JSON.stringify(record)
-    });
+    res = await supabaseClient
+      .from('user_data')
+      .upsert({ user_id: userData.user.id, domain, data: record, updated_at: new Date().toISOString() }, { onConflict: 'user_id,domain' });
   } catch (networkErr) {
-    const err = new Error('No se pudo contactar a JSONBin: ' + networkErr.message);
+    const err = new Error('No se pudo contactar a Supabase: ' + networkErr.message);
     err.networkFailure = true;
     throw err;
   }
-  if (!res.ok) {
-    let detail = '';
-    try { detail = (await res.json()).error || ''; } catch (e) {}
-    const err = new Error('jsonbin put ' + res.status + (detail ? ': ' + detail : ''));
-    err.status = res.status;
+  if (res.error) {
+    const err = new Error('supabase put ' + domain + ': ' + res.error.message);
+    err.status = 500;
     throw err;
   }
   return true;
@@ -916,33 +934,49 @@ function markPending(domain, isPending, message) {
   showOffline(pendingSync.nutrition || pendingSync.gym || pendingSync.photos, message);
 }
 
-async function persistDomain(domain, binId, record) {
-  saveLocalCache(domain, record);
-  setSaving('Guardando…');
+const DEBOUNCE_MS = 2500;
+const pendingWriteTimers = {};
+async function flushDomain(domain) {
+  clearTimeout(pendingWriteTimers[domain]);
+  delete pendingWriteTimers[domain];
+  const record = state[domain];
+  if (!record) return;
   try {
-    await jsonbinPut(binId, record);
+    await jsonbinPut(domain, record);
     markPending(domain, false);
     setSaving('');
   } catch (e) {
     const message = syncMessageFor(e);
-    console.warn('Error al guardar en JSONBin:', e.message);
+    console.warn('Error al guardar en Supabase:', e.message);
     markPending(domain, true, message);
     setSaving(message);
   }
 }
-async function persistNutrition() { await persistDomain('nutrition', NUTRITION_BIN_ID, state.nutrition); }
-async function persistGym() { await persistDomain('gym', GYM_BIN_ID, state.gym); }
-async function persistPhotos() { await persistDomain('photos', PHOTOS_BIN_ID, state.photos); }
+function flushAllPending() {
+  Object.keys(pendingWriteTimers).forEach(flushDomain);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAllPending(); });
+window.addEventListener('pagehide', flushAllPending);
+
+async function persistDomain(domain, record) {
+  saveLocalCache(domain, record);
+  setSaving('Guardando…');
+  clearTimeout(pendingWriteTimers[domain]);
+  pendingWriteTimers[domain] = setTimeout(() => flushDomain(domain), DEBOUNCE_MS);
+}
+async function persistNutrition() { await persistDomain('nutrition', state.nutrition); }
+async function persistGym() { await persistDomain('gym', state.gym); }
+async function persistPhotos() { await persistDomain('photos', state.photos); }
 
 async function trySyncPending() {
   if (pendingSync.nutrition) {
-    try { await jsonbinPut(NUTRITION_BIN_ID, state.nutrition); markPending('nutrition', false); } catch (e) {}
+    try { await jsonbinPut('nutrition', state.nutrition); markPending('nutrition', false); } catch (e) {}
   }
   if (pendingSync.gym) {
-    try { await jsonbinPut(GYM_BIN_ID, state.gym); markPending('gym', false); } catch (e) {}
+    try { await jsonbinPut('gym', state.gym); markPending('gym', false); } catch (e) {}
   }
   if (pendingSync.photos) {
-    try { await jsonbinPut(PHOTOS_BIN_ID, state.photos); markPending('photos', false); } catch (e) {}
+    try { await jsonbinPut('photos', state.photos); markPending('photos', false); } catch (e) {}
   }
 }
 window.addEventListener('online', trySyncPending);
@@ -955,10 +989,10 @@ async function loadAll() {
   try {
     if (localNutritionPending) {
       const cached = loadLocalCache('nutrition');
-      if (cached) { await jsonbinPut(NUTRITION_BIN_ID, cached); markPending('nutrition', false); state.nutrition = cached; }
-      else state.nutrition = await jsonbinGet(NUTRITION_BIN_ID);
+      if (cached) { await jsonbinPut('nutrition', cached); markPending('nutrition', false); state.nutrition = cached; }
+      else state.nutrition = await jsonbinGet('nutrition');
     } else {
-      state.nutrition = await jsonbinGet(NUTRITION_BIN_ID);
+      state.nutrition = await jsonbinGet('nutrition');
     }
     saveLocalCache('nutrition', state.nutrition);
   } catch (e) {
@@ -987,10 +1021,10 @@ async function loadAll() {
   try {
     if (localGymPending) {
       const cached = loadLocalCache('gym');
-      if (cached) { await jsonbinPut(GYM_BIN_ID, cached); markPending('gym', false); state.gym = cached; }
-      else state.gym = await jsonbinGet(GYM_BIN_ID);
+      if (cached) { await jsonbinPut('gym', cached); markPending('gym', false); state.gym = cached; }
+      else state.gym = await jsonbinGet('gym');
     } else {
-      state.gym = await jsonbinGet(GYM_BIN_ID);
+      state.gym = await jsonbinGet('gym');
     }
     saveLocalCache('gym', state.gym);
   } catch (e) {
@@ -1012,10 +1046,10 @@ async function loadAll() {
   try {
     if (localPhotosPending) {
       const cached = loadLocalCache('photos');
-      if (cached) { await jsonbinPut(PHOTOS_BIN_ID, cached); markPending('photos', false); state.photos = cached; }
-      else state.photos = await jsonbinGet(PHOTOS_BIN_ID);
+      if (cached) { await jsonbinPut('photos', cached); markPending('photos', false); state.photos = cached; }
+      else state.photos = await jsonbinGet('photos');
     } else {
-      state.photos = await jsonbinGet(PHOTOS_BIN_ID);
+      state.photos = await jsonbinGet('photos');
     }
     saveLocalCache('photos', state.photos);
   } catch (e) {
@@ -2886,6 +2920,8 @@ function renderCarga() {
 
 /* ====================== EVENTOS ====================== */
 function wireEvents() {
+  document.getElementById('logout-btn').onclick = () => supabaseClient.auth.signOut();
+  document.getElementById('migrate-btn').onclick = migrateFromJsonBin;
   document.getElementById('prev-day').onclick = () => { selectedDate = addDaysStr(selectedDate, -1); renderAll(); };
   document.getElementById('next-day').onclick = () => { selectedDate = addDaysStr(selectedDate, 1); renderAll(); };
   document.getElementById('date-input').onchange = (e) => { selectedDate = e.target.value; renderAll(); };
@@ -3236,8 +3272,55 @@ function renumberSets() {
 }
 
 /* ====================== INIT ====================== */
+/* ====================== MIGRACIÓN ÚNICA: datos viejos de JSONBin -> Supabase ====================== */
+const OLD_JSONBIN_MASTER_KEY = '$2a$10$k.R5Udtn8mYhhnrwn9mPcOpEg/eo937TGhFk48UdrUQx9BRxzfh0W';
+const OLD_JSONBIN_BASE = 'https://api.jsonbin.io/v3/b/';
+const OLD_BIN_IDS = { nutrition: '6aa157a0ffd5d16053f1a727', gym: '6aa157afac6210605ab8076a', photos: '6aa44f42ffd5d16053fb7201' };
+async function migrateFromJsonBin() {
+  const status = document.getElementById('migrate-status');
+  status.classList.add('show');
+  status.textContent = 'Migrando…';
+  try {
+    for (const domain of ['nutrition', 'gym', 'photos']) {
+      const res = await fetch(OLD_JSONBIN_BASE + OLD_BIN_IDS[domain] + '/latest', { headers: { 'X-Master-Key': OLD_JSONBIN_MASTER_KEY } });
+      if (!res.ok) throw new Error('No se pudo leer ' + domain + ' de JSONBin (' + res.status + ')');
+      const record = (await res.json()).record;
+      await jsonbinPut(domain, record);
+      state[domain] = record;
+      saveLocalCache(domain, record);
+    }
+    status.textContent = '¡Listo! Tus datos viejos ya están en tu cuenta nueva.';
+    renderAll();
+  } catch (e) {
+    status.textContent = 'Error en la migración: ' + e.message;
+    console.warn(e);
+  }
+}
+
 async function init() {
   wireEvents();
+  document.getElementById('login-google-btn').onclick = async () => {
+    const { error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+    if (error) document.getElementById('login-error').textContent = error.message;
+  };
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    await startApp();
+  } else {
+    document.getElementById('login-gate').style.display = 'flex';
+  }
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && document.getElementById('app-wrap').style.display === 'none') {
+      startApp();
+    } else if (event === 'SIGNED_OUT') {
+      document.getElementById('app-wrap').style.display = 'none';
+      document.getElementById('login-gate').style.display = 'flex';
+    }
+  });
+}
+async function startApp() {
+  document.getElementById('login-gate').style.display = 'none';
+  document.getElementById('app-wrap').style.display = '';
   setSaving('Cargando…');
   await loadAll();
   await whoopHandleRedirectIfPresent();
