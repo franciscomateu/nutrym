@@ -43,7 +43,8 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
-  .wrap { max-width: 780px; margin: 0 auto; padding: 16px 16px 32px; }
+  #deportes-backdrop { position: fixed; inset: 0; z-index: 0; display: none; background-size: cover; background-position: center; background-attachment: fixed; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 16px 16px 32px; position: relative; z-index: 1; }
 
   .header {
     display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;
@@ -61,6 +62,7 @@
   .dateinput { border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 6px 10px; font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 600; background: var(--bg); color: var(--ink); }
 
   .hero { background: var(--ink); color: var(--bg); border-radius: var(--radius); padding: 24px 22px; margin-bottom: 14px; box-shadow: 0 4px 16px rgba(20,24,28,0.18); }
+  #sports-hero { background: transparent; box-shadow: none; }
   .hero-label { font-size: 12px; color: #9BA3AA; margin-bottom: 12px; text-transform: capitalize; font-weight: 600; }
   .daytype-row { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
   .daytype-row label { font-size: 11px; color: #9BA3AA; }
@@ -226,6 +228,7 @@
   </button>
   <div class="error-box" id="login-error"></div>
 </div>
+<div id="deportes-backdrop"></div>
 <div class="wrap" id="app-wrap" style="display:none;">
 
 
@@ -1177,6 +1180,7 @@ async function loadAll() {
   if (!state.photos.photos) state.photos.photos = {};
   if (!state.photos.foodPhotos) state.photos.foodPhotos = {};
   if (!state.photos.sportPhotos) state.photos.sportPhotos = {};
+  if (!state.photos.sportBackgrounds) state.photos.sportBackgrounds = {};
 
   // Perfil deportivo
   const localSportsPending = localStorage.getItem(pendingKey('sports')) === '1';
@@ -3868,10 +3872,21 @@ function updateHeroVisibility() {
   const onSports = activeTab === 'deportes' && currentSportKey !== 'actividad';
   document.getElementById('calorie-hero').style.display = onSports ? 'none' : '';
   document.getElementById('sports-hero').style.display = onSports ? 'block' : 'none';
+  document.getElementById('deportes-backdrop').style.display = onSports ? 'block' : 'none';
   if (onSports) {
-    const tpl = SPORT_TEMPLATES[currentSportKey];
-    document.getElementById('sports-hero').style.background = (tpl && FIELD_BACKGROUNDS[tpl.fieldType]) || FIELD_BACKGROUNDS.grass;
+    applySportsHeroBackground();
     renderSportsHero();
+  }
+}
+function applySportsHeroBackground() {
+  const tpl = SPORT_TEMPLATES[currentSportKey];
+  const bg = state.photos.sportBackgrounds && state.photos.sportBackgrounds[currentSportKey];
+  const backdrop = document.getElementById('deportes-backdrop');
+  const fallback = (tpl && FIELD_BACKGROUNDS[tpl.fieldType]) || FIELD_BACKGROUNDS.grass;
+  if (bg) {
+    backdrop.style.backgroundImage = `linear-gradient(180deg, rgba(20,24,28,0.55), rgba(20,24,28,0.82)), url('${bg.image}')`;
+  } else {
+    backdrop.style.backgroundImage = fallback;
   }
 }
 function renderSportsHero() {
@@ -3906,7 +3921,11 @@ function renderSportsHero() {
       <div class="hero-breakdown-item"><div class="stat-label">Entrenamientos</div><div class="stat-value">${sportTrainings(currentSportKey).length}</div></div>
       <div class="hero-breakdown-item"><div class="stat-label">Récord</div><div class="stat-value" style="font-size:15px;">${stats.record.g}G-${stats.record.e}E-${stats.record.p}P</div></div>
     </div>
-    ${matches.length >= 2 ? `<div style="margin-top:16px;"><canvas id="sports-hero-chart" height="110"></canvas></div>` : ''}`;
+    ${matches.length >= 2 ? `<div style="margin-top:16px;"><canvas id="sports-hero-chart" height="110"></canvas></div>` : ''}
+    <div style="margin-top:14px; text-align:right;">
+      <button type="button" class="linkbtn" id="sports-hero-bg-btn" style="color:#C7CDD2; font-size:11px;">${(state.photos.sportBackgrounds && state.photos.sportBackgrounds[currentSportKey]) ? 'Cambiar fondo de cancha' : 'Subir foto de fondo (cancha/club)'}</button>
+      <input type="file" accept="image/*" id="sports-hero-bg-input" style="display:none;">
+    </div>`;
 
   document.getElementById('sports-hero-photo-btn').onclick = () => document.getElementById('sports-hero-photo-input').click();
   document.getElementById('sports-hero-photo-input').onchange = async (e) => {
@@ -3916,6 +3935,17 @@ function renderSportsHero() {
     if (!state.photos.sportPhotos) state.photos.sportPhotos = {};
     state.photos.sportPhotos[currentSportKey] = { image: dataUrl, savedAt: new Date().toISOString() };
     persistPhotos();
+    renderSportsHero();
+  };
+  document.getElementById('sports-hero-bg-btn').onclick = () => document.getElementById('sports-hero-bg-input').click();
+  document.getElementById('sports-hero-bg-input').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const dataUrl = await compressImageFile(file, 900);
+    if (!state.photos.sportBackgrounds) state.photos.sportBackgrounds = {};
+    state.photos.sportBackgrounds[currentSportKey] = { image: dataUrl, savedAt: new Date().toISOString() };
+    persistPhotos();
+    applySportsHeroBackground();
     renderSportsHero();
   };
   if (matches.length >= 2) {
