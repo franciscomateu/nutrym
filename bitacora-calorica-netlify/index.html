@@ -83,14 +83,14 @@
 
   .tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px;
     background: var(--card); border-top: 1px solid var(--card-border);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     box-shadow: 0 -2px 10px rgba(20,24,28,0.06);
   }
-  .tab { background: none; border: none; cursor: pointer; padding: 6px 2px; font-family: 'Manrope', sans-serif; color: var(--ink-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .tab svg { width: 20px; height: 20px; }
-  .tab-label { font-size: 9.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tab { background: none; border: none; cursor: pointer; padding: 6px 1px; font-family: 'Manrope', sans-serif; color: var(--ink-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .tab svg { width: 18px; height: 18px; }
+  .tab-label { font-size: 8.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .tab.active { color: var(--accent); background: var(--accent-soft); }
   .tab.active { color: #fff; background: var(--accent); }
   .subtabs {
@@ -689,7 +689,8 @@
 
         <h3 style="margin-top:20px;">Apple Health</h3>
         <div id="applehealth-content"></div>
-        <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — no hace falta que hagas nada acá.</div>
+        <button type="button" class="btn secondary" id="applehealth-refresh-btn" style="margin-top:10px;">Actualizar</button>
+        <div class="hint">Se actualiza solo, todos los días, desde un Atajo de iOS que corre en tu iPhone — si ya lo corriste y no ves el número nuevo, tocá "Actualizar".</div>
         <div class="hint" style="margin-top:8px;">Tu ID para configurar el Atajo (va como valor del header <code>X-Health-Token</code>):</div>
         <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
           <code id="my-user-id" style="font-size:11px; word-break:break-all; flex:1;"></code>
@@ -2438,6 +2439,18 @@ function renderWhoopStatus() {
   }
 }
 
+async function refreshAppleHealth() {
+  const btn = document.getElementById('applehealth-refresh-btn');
+  btn.disabled = true; btn.textContent = 'Actualizando…';
+  try {
+    const fresh = await jsonbinGet('nutrition');
+    state.nutrition.appleHealth = fresh.appleHealth || {};
+    renderAppleHealth();
+  } catch (e) {
+    console.warn('No se pudo actualizar Apple Health:', e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Actualizar';
+}
 function renderAppleHealth() {
   const box = document.getElementById('applehealth-content');
   const data = (state.nutrition.appleHealth || {})[selectedDate];
@@ -3109,6 +3122,8 @@ function wireEvents() {
   document.querySelectorAll('#sports-subtabs .subtab').forEach(btn => {
     btn.onclick = () => {
       currentSportKey = btn.dataset.sportkey;
+      editingMatchId = null;
+      editingTrainingId = null;
       document.querySelectorAll('#sports-subtabs .subtab').forEach(b => b.classList.toggle('active', b === btn));
       if (currentSportKey === 'actividad') {
         document.getElementById('sports-content').style.display = 'none';
@@ -3140,6 +3155,7 @@ function wireEvents() {
   document.getElementById('insights-info-close').onclick = () => {
     document.getElementById('insights-info-overlay').style.display = 'none';
   };
+  document.getElementById('applehealth-refresh-btn').onclick = refreshAppleHealth;
   document.getElementById('show-install-guide-btn').onclick = showInstallGuide;
   document.getElementById('install-guide-close').onclick = () => {
     document.getElementById('install-guide-overlay').style.display = 'none';
@@ -3684,6 +3700,8 @@ const SPORT_TEMPLATES = {
 let currentSportKey = 'rugby';
 let sportMatchSelectedClub = null;
 let sportProfileSelectedClub = null;
+let editingMatchId = null;
+let editingTrainingId = null;
 
 function whoopLinkFieldHtml(id) {
   const pool = state.gym.whoopWorkoutPool || [];
@@ -3838,7 +3856,8 @@ function renderSportSection() {
       </div>
       <div class="field" style="margin-top:10px;"><label>Foco del entrenamiento</label><input type="text" id="training-focus" placeholder="Ej: scrum y contacto"></div>
       ${whoopLinkFieldHtml('training-whoop-link')}
-      <button type="button" class="btn secondary" id="training-add-btn" style="margin-top:10px;">Agregar entrenamiento</button>
+      <button type="button" class="btn secondary" id="training-add-btn" style="margin-top:10px;">${editingTrainingId ? 'Guardar cambios' : 'Agregar entrenamiento'}</button>
+      ${editingTrainingId ? `<button type="button" class="linkbtn" id="training-cancel-edit">Cancelar edición</button>` : ''}
     </div>
     <div class="panel">
       <h3>Entrenamientos recientes</h3>
@@ -3849,7 +3868,10 @@ function renderSportSection() {
             ${t.focus ? `<div class="entry-meta">${escapeHtml(t.focus)}</div>` : ''}
             ${t.whoopData ? `<div class="entry-meta">Whoop: ${t.whoopData.durationMin}min · ${t.whoopData.kcal}kcal${t.whoopData.strain != null ? ' · strain ' + t.whoopData.strain : ''}</div>` : ''}
           </div>
-          <button class="del" data-remove-training="${t.id}">✕</button>
+          <div class="entry-right">
+            <button class="linkbtn" data-edit-training="${t.id}">Editar</button>
+            <button class="del" data-remove-training="${t.id}">✕</button>
+          </div>
         </div>`).join('') : '<div class="empty">Sin entrenamientos cargados todavía.</div>'}
     </div>`;
   }
@@ -3884,7 +3906,8 @@ function renderSportSection() {
       ${tpl.matchStats.map(st => `<div class="field"><label>${escapeHtml(st.label)}</label><input type="${st.type === 'number' ? 'number' : 'text'}" id="match-stat-${st.key}"></div>`).join('')}
     </div>` : ''}
     ${whoopLinkFieldHtml('match-whoop-link')}
-    <button type="button" class="btn" id="match-add-btn" style="margin-top:12px;">Agregar partido</button>
+    <button type="button" class="btn" id="match-add-btn" style="margin-top:12px;">${editingMatchId ? 'Guardar cambios' : 'Agregar partido'}</button>
+    ${editingMatchId ? `<button type="button" class="linkbtn" id="match-cancel-edit">Cancelar edición</button>` : ''}
   </div>
   <div class="panel">
     <h3>Partidos</h3>
@@ -3896,7 +3919,10 @@ function renderSportSection() {
           ${m.whoopData ? `<div class="entry-meta">Whoop: ${m.whoopData.durationMin}min · ${m.whoopData.kcal}kcal${m.whoopData.strain != null ? ' · strain ' + m.whoopData.strain : ''}</div>` : ''}
           ${m.stats && Object.keys(m.stats).length ? `<div class="entry-meta">${Object.entries(m.stats).map(([k, v]) => (tpl.matchStats.find(s => s.key === k) || {}).label + ': ' + v).join(' · ')}</div>` : ''}
         </div>
-        <button class="del" data-remove-match="${m.id}">✕</button>
+        <div class="entry-right">
+          <button class="linkbtn" data-edit-match="${m.id}">Editar</button>
+          <button class="del" data-remove-match="${m.id}">✕</button>
+        </div>
       </div>`).join('') : '<div class="empty">Todavía no cargaste partidos.</div>'}
   </div>`;
 
@@ -3925,20 +3951,45 @@ function wireSportSectionEvents(tpl) {
   };
 
   if (tpl.hasTrainings) {
+    if (editingTrainingId) {
+      const t = sportTrainings(currentSportKey).find(x => x.id === editingTrainingId);
+      if (t) {
+        document.getElementById('training-date').value = t.date;
+        document.getElementById('training-rpe').value = t.rpe || '';
+        document.getElementById('training-feeling').value = t.feeling || 'bien';
+        document.getElementById('training-focus').value = t.focus || '';
+      }
+    }
     document.getElementById('training-add-btn').onclick = () => {
-      if (!state.sports.trainings[currentSportKey]) state.sports.trainings[currentSportKey] = [];
-      const whoopData = getWhoopLinkData('training-whoop-link');
-      state.sports.trainings[currentSportKey].push({
-        id: uid(),
+      const whoopSel = getWhoopLinkData('training-whoop-link');
+      const trainingData = {
         date: document.getElementById('training-date').value || todayStr(),
         rpe: Number(document.getElementById('training-rpe').value) || null,
         feeling: document.getElementById('training-feeling').value,
-        focus: document.getElementById('training-focus').value.trim(),
-        whoopData
-      });
+        focus: document.getElementById('training-focus').value.trim()
+      };
+      if (!state.sports.trainings[currentSportKey]) state.sports.trainings[currentSportKey] = [];
+      if (editingTrainingId) {
+        const idx = state.sports.trainings[currentSportKey].findIndex(x => x.id === editingTrainingId);
+        if (idx > -1) {
+          const prev = state.sports.trainings[currentSportKey][idx];
+          trainingData.whoopData = whoopSel || prev.whoopData || null;
+          state.sports.trainings[currentSportKey][idx] = { ...prev, ...trainingData };
+        }
+        editingTrainingId = null;
+      } else {
+        trainingData.id = uid();
+        trainingData.whoopData = whoopSel;
+        state.sports.trainings[currentSportKey].push(trainingData);
+      }
       persistSports();
       renderSportSection();
     };
+    const trainingCancelBtn = document.getElementById('training-cancel-edit');
+    if (trainingCancelBtn) trainingCancelBtn.onclick = () => { editingTrainingId = null; renderSportSection(); };
+    document.querySelectorAll('[data-edit-training]').forEach(btn => {
+      btn.onclick = () => { editingTrainingId = btn.dataset.editTraining; renderSportSection(); };
+    });
     document.querySelectorAll('[data-remove-training]').forEach(btn => {
       btn.onclick = () => {
         const id = btn.dataset.removeTraining;
@@ -3956,6 +4007,26 @@ function wireSportSectionEvents(tpl) {
       document.getElementById('match-club-selected').textContent = 'Elegiste: ' + team.name;
     });
   }
+  if (editingMatchId) {
+    const m = sportMatches(currentSportKey).find(x => x.id === editingMatchId);
+    if (m) {
+      document.getElementById('match-date').value = m.date;
+      document.getElementById('match-opponent').value = m.opponent || '';
+      document.getElementById('match-result').value = m.result;
+      document.getElementById('match-score').value = m.score || '';
+      document.getElementById('match-rating').value = m.selfRating || '';
+      if (tpl.positions) document.getElementById('match-position').value = m.position || '';
+      if (extra.includes('equipo')) document.getElementById('match-team').value = m.team || '';
+      if (extra.includes('club') && m.club) {
+        sportMatchSelectedClub = m.club;
+        document.getElementById('match-club-selected').textContent = 'Elegiste: ' + m.club.name;
+      }
+      (tpl.matchStats || []).forEach(st => {
+        const el = document.getElementById('match-stat-' + st.key);
+        if (el && m.stats && m.stats[st.key] != null) el.value = m.stats[st.key];
+      });
+    }
+  }
   document.getElementById('match-add-btn').onclick = () => {
     const stats = {};
     (tpl.matchStats || []).forEach(st => {
@@ -3963,24 +4034,41 @@ function wireSportSectionEvents(tpl) {
       if (!el || el.value === '') return;
       stats[st.key] = st.type === 'number' ? Number(el.value) : el.value.trim();
     });
-    const match = {
-      id: uid(),
+    const whoopSel = getWhoopLinkData('match-whoop-link');
+    const matchData = {
       date: document.getElementById('match-date').value || todayStr(),
       opponent: document.getElementById('match-opponent').value.trim(),
       result: document.getElementById('match-result').value,
       score: document.getElementById('match-score').value.trim(),
       selfRating: Number(document.getElementById('match-rating').value) || null,
-      stats,
-      whoopData: getWhoopLinkData('match-whoop-link')
+      stats
     };
-    if (tpl.positions) match.position = document.getElementById('match-position').value;
-    if (extra.includes('equipo')) match.team = document.getElementById('match-team').value.trim();
-    if (extra.includes('club') && sportMatchSelectedClub) match.club = sportMatchSelectedClub;
+    if (tpl.positions) matchData.position = document.getElementById('match-position').value;
+    if (extra.includes('equipo')) matchData.team = document.getElementById('match-team').value.trim();
+    if (extra.includes('club') && sportMatchSelectedClub) matchData.club = sportMatchSelectedClub;
     if (!state.sports.matches[currentSportKey]) state.sports.matches[currentSportKey] = [];
-    state.sports.matches[currentSportKey].push(match);
+    if (editingMatchId) {
+      const idx = state.sports.matches[currentSportKey].findIndex(x => x.id === editingMatchId);
+      if (idx > -1) {
+        const prev = state.sports.matches[currentSportKey][idx];
+        matchData.whoopData = whoopSel || prev.whoopData || null;
+        matchData.club = matchData.club || prev.club || null;
+        state.sports.matches[currentSportKey][idx] = { ...prev, ...matchData };
+      }
+      editingMatchId = null;
+    } else {
+      matchData.id = uid();
+      matchData.whoopData = whoopSel;
+      state.sports.matches[currentSportKey].push(matchData);
+    }
     persistSports();
     renderSportSection();
   };
+  const matchCancelBtn = document.getElementById('match-cancel-edit');
+  if (matchCancelBtn) matchCancelBtn.onclick = () => { editingMatchId = null; renderSportSection(); };
+  document.querySelectorAll('[data-edit-match]').forEach(btn => {
+    btn.onclick = () => { editingMatchId = btn.dataset.editMatch; renderSportSection(); };
+  });
   document.querySelectorAll('[data-remove-match]').forEach(btn => {
     btn.onclick = () => {
       const id = btn.dataset.removeMatch;
