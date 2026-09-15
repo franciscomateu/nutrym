@@ -83,7 +83,7 @@
 
   .tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
-    display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
     background: var(--card); border-top: 1px solid var(--card-border);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     box-shadow: 0 -2px 10px rgba(20,24,28,0.06);
@@ -115,6 +115,7 @@
   #tab-historial .panel { border-left: 3px solid var(--gold); background: linear-gradient(180deg, var(--gold-soft) 0%, var(--card) 90px); }
   #tab-dispositivos .panel { border-left: 3px solid var(--slate); }
   #tab-nutria .panel { border-left: 3px solid var(--gold); }
+  #tab-deportes .panel { border-left: 3px solid var(--danger); background: linear-gradient(180deg, var(--danger-soft) 0%, var(--card) 90px); }
   #tab-config .panel { border-left: 3px solid var(--card-border); }
 
   .entry { display: flex; justify-content: space-between; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 8px; }
@@ -286,6 +287,10 @@
     <button class="tab" data-tab="dispositivos">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="16" rx="2"/><path d="M11 18h2"/></svg>
       <span class="tab-label">Dispositivos</span>
+    </button>
+    <button class="tab" data-tab="deportes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.4 15 9.5l-1.1 3.6H10.1L9 9.5zM12 7.4V4M15 9.5l3-.9M13.4 12.6l1.8 2.8M10.6 12.6l-1.8 2.8M9 9.5l-3-.9"/></svg>
+      <span class="tab-label">Deportes</span>
     </button>
     <button class="tab" data-tab="nutria">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>
@@ -544,6 +549,15 @@
   </section>
 
   <!-- HISTORIAL -->
+  <section id="tab-deportes" class="tabsection" style="display:none;">
+    <div class="subtabs" id="sports-subtabs">
+      <button class="subtab active" data-sportkey="rugby">Rugby</button>
+      <button class="subtab" data-sportkey="futbol">Fútbol</button>
+      <button class="subtab" data-sportkey="padel">Pádel</button>
+    </div>
+    <div id="sports-content"></div>
+  </section>
+
   <section id="tab-historial" class="tabsection" style="display:none;">
     <div class="panel">
       <h3>Evolución</h3>
@@ -921,7 +935,8 @@ function comboById(id) { return ROUTINE_COMBOS.find(c => c.id === id) || ROUTINE
 let state = {
   nutrition: { settings: DEFAULT_SETTINGS, days: {} },
   gym: { exercises: DEFAULT_EXERCISES, logs: {}, currentRoutine: null, routineHistory: [], sportLogs: {}, whoop: null, pushSubscription: null },
-  photos: { photos: {} }
+  photos: { photos: {} },
+  sports: { profiles: {}, trainings: {}, matches: {}, badges: [] }
 };
 let selectedDate = todayStr();
 let activeTab = 'alimentacion';
@@ -931,7 +946,7 @@ let charts = {};
 let foodNameDebounceTimer = null;
 let userEditedFoodFields = false;
 let lastEstimatedFoodName = '';
-let pendingSync = { nutrition: false, gym: false, photos: false };
+let pendingSync = { nutrition: false, gym: false, photos: false, sports: false };
 
 /* ====================== UTILIDADES ====================== */
 function todayStr() {
@@ -1039,7 +1054,7 @@ function markPending(domain, isPending, message) {
     if (isPending) localStorage.setItem(pendingKey(domain), '1');
     else localStorage.removeItem(pendingKey(domain));
   } catch (e) {}
-  showOffline(pendingSync.nutrition || pendingSync.gym || pendingSync.photos, message);
+  showOffline(pendingSync.nutrition || pendingSync.gym || pendingSync.photos || pendingSync.sports, message);
 }
 
 const DEBOUNCE_MS = 2500;
@@ -1075,6 +1090,7 @@ async function persistDomain(domain, record) {
 async function persistNutrition() { await persistDomain('nutrition', state.nutrition); }
 async function persistGym() { await persistDomain('gym', state.gym); }
 async function persistPhotos() { await persistDomain('photos', state.photos); }
+async function persistSports() { await persistDomain('sports', state.sports); }
 
 async function trySyncPending() {
   if (pendingSync.nutrition) {
@@ -1085,6 +1101,9 @@ async function trySyncPending() {
   }
   if (pendingSync.photos) {
     try { await jsonbinPut('photos', state.photos); markPending('photos', false); } catch (e) {}
+  }
+  if (pendingSync.sports) {
+    try { await jsonbinPut('sports', state.sports); markPending('sports', false); } catch (e) {}
   }
 }
 window.addEventListener('online', trySyncPending);
@@ -1166,6 +1185,26 @@ async function loadAll() {
   }
   if (!state.photos.photos) state.photos.photos = {};
   if (!state.photos.foodPhotos) state.photos.foodPhotos = {};
+
+  // Perfil deportivo
+  const localSportsPending = localStorage.getItem(pendingKey('sports')) === '1';
+  try {
+    if (localSportsPending) {
+      const cached = loadLocalCache('sports');
+      if (cached) { await jsonbinPut('sports', cached); markPending('sports', false); state.sports = cached; }
+      else state.sports = await jsonbinGet('sports');
+    } else {
+      state.sports = await jsonbinGet('sports');
+    }
+    saveLocalCache('sports', state.sports);
+  } catch (e) {
+    const cached = loadLocalCache('sports');
+    if (cached) { state.sports = cached; markPending('sports', true, syncMessageFor(e)); console.warn('Error al cargar deportes desde Supabase:', e.message); }
+  }
+  if (!state.sports.profiles) state.sports.profiles = {};
+  if (!state.sports.trainings) state.sports.trainings = {};
+  if (!state.sports.matches) state.sports.matches = {};
+  if (!state.sports.badges) state.sports.badges = [];
 }
 
 /* ====================== NUTRICIÓN: helpers de datos ====================== */
@@ -2194,6 +2233,7 @@ function renderAll() {
   renderCarga();
   renderConfig();
   renderClubBadge();
+  renderSportSection();
   renderProfilePhoto();
   renderWhoopStatus();
   renderWhoopVitalsStatus();
@@ -3035,6 +3075,13 @@ function renderCarga() {
 
 /* ====================== EVENTOS ====================== */
 function wireEvents() {
+  document.querySelectorAll('#sports-subtabs .subtab').forEach(btn => {
+    btn.onclick = () => {
+      currentSportKey = btn.dataset.sportkey;
+      document.querySelectorAll('#sports-subtabs .subtab').forEach(b => b.classList.toggle('active', b === btn));
+      renderSportSection();
+    };
+  });
   wireClubSearch('cfg-club-search', 'cfg-club-results', (team) => {
     state.nutrition.settings.club = { name: team.name, badgeUrl: team.badgeUrl };
     persistNutrition();
@@ -3444,25 +3491,38 @@ function wireClubSearch(inputId, resultsId, onSelect) {
     if (q.length < 3) { results.innerHTML = ''; return; }
     clubSearchTimer = setTimeout(async () => {
       results.innerHTML = '<div class="hint">Buscando…</div>';
+      const useAsIsRow = `<div class="club-result-row" data-use-as-is="1">
+        <div class="club-result-badge-fallback"></div>
+        <span>Usar "${escapeHtml(q)}" igual (sin logo)</span>
+      </div>`;
       try {
         const res = await fetch('/.netlify/functions/club-search?q=' + encodeURIComponent(q));
         const data = await res.json();
         const teams = data.teams || [];
-        if (!teams.length) { results.innerHTML = '<div class="hint">No encontramos ese club — probá con otro nombre.</div>'; return; }
-        results.innerHTML = teams.map((t, i) => `
+        const teamsHtml = teams.map((t, i) => `
           <div class="club-result-row" data-idx="${i}">
             ${t.badgeUrl ? `<img src="${t.badgeUrl}" class="club-result-badge">` : '<div class="club-result-badge-fallback"></div>'}
             <span>${escapeHtml(t.name)}${t.country ? ' <span class="entry-meta">(' + escapeHtml(t.country) + ')</span>' : ''}</span>
           </div>`).join('');
-        results.querySelectorAll('.club-result-row').forEach(row => {
+        results.innerHTML = (teams.length ? teamsHtml : '<div class="hint">No encontramos ese club en la base de datos.</div>') + useAsIsRow;
+        results.querySelectorAll('[data-idx]').forEach(row => {
           row.onclick = () => {
             onSelect(teams[Number(row.dataset.idx)]);
-            results.innerHTML = '';
-            input.value = '';
+            results.innerHTML = ''; input.value = '';
           };
         });
+        const useAsIsEl = results.querySelector('[data-use-as-is]');
+        if (useAsIsEl) useAsIsEl.onclick = () => {
+          onSelect({ name: q, badgeUrl: null });
+          results.innerHTML = ''; input.value = '';
+        };
       } catch (e) {
-        results.innerHTML = '<div class="hint">No se pudo buscar. Probá de nuevo.</div>';
+        results.innerHTML = '<div class="hint">No se pudo buscar.</div>' + useAsIsRow;
+        const useAsIsEl = results.querySelector('[data-use-as-is]');
+        if (useAsIsEl) useAsIsEl.onclick = () => {
+          onSelect({ name: q, badgeUrl: null });
+          results.innerHTML = ''; input.value = '';
+        };
       }
     }, 400);
   };
@@ -3568,6 +3628,276 @@ function finishOnboarding(applyAnswers) {
   document.getElementById('onboarding-overlay').style.display = 'none';
   renderAll();
   maybeShowInstallGuide();
+}
+
+/* ====================== PERFIL DEPORTIVO ====================== */
+const SPORT_TEMPLATES = {
+  rugby: {
+    label: 'Rugby',
+    hasTrainings: true,
+    hasProfileClub: true,
+    positions: ['Pilar', 'Hooker', '2ª línea', 'Ala', 'Octavo', 'Medio scrum', 'Apertura', 'Centro', 'Wing', 'Fullback'],
+    matchStats: [
+      { key: 'puntos', label: 'Puntos', type: 'number' },
+      { key: 'tries', label: 'Tries', type: 'number' },
+      { key: 'conversiones', label: 'Conversiones convertidas', type: 'number' },
+      { key: 'conversionesIntentadas', label: 'Conversiones intentadas', type: 'number' }
+    ]
+  },
+  futbol: {
+    label: 'Fútbol',
+    hasTrainings: true,
+    hasProfileClub: false,
+    positions: ['Arquero', 'Defensor', 'Mediocampista', 'Delantero'],
+    matchExtraFields: ['equipo'],
+    matchStats: [
+      { key: 'goles', label: 'Goles', type: 'number' },
+      { key: 'asistencias', label: 'Asistencias', type: 'number' }
+    ]
+  },
+  padel: {
+    label: 'Pádel',
+    hasTrainings: false,
+    hasProfileClub: false,
+    matchExtraFields: ['club'],
+    matchStats: [
+      { key: 'raqueta', label: 'Raqueta usada', type: 'text' }
+    ]
+  }
+};
+let currentSportKey = 'rugby';
+let sportMatchSelectedClub = null;
+let sportProfileSelectedClub = null;
+
+function sportProfile(key) { return (state.sports.profiles && state.sports.profiles[key]) || {}; }
+function sportMatches(key) { return (state.sports.matches && state.sports.matches[key]) || []; }
+function sportTrainings(key) { return (state.sports.trainings && state.sports.trainings[key]) || []; }
+
+function computeSportStats(key) {
+  const matches = sportMatches(key);
+  const record = { g: 0, e: 0, p: 0 };
+  matches.forEach(m => { if (m.result === 'ganado') record.g++; else if (m.result === 'empatado') record.e++; else if (m.result === 'perdido') record.p++; });
+  const sorted = [...matches].sort((a, b) => b.date.localeCompare(a.date));
+  let streak = 0, streakResult = sorted.length ? sorted[0].result : null;
+  for (const m of sorted) { if (m.result === streakResult) streak++; else break; }
+  const ratings = matches.map(m => Number(m.selfRating)).filter(n => !isNaN(n));
+  const avgRating = ratings.length ? Math.round((ratings.reduce((s, n) => s + n, 0) / ratings.length) * 10) / 10 : null;
+  const statSums = {};
+  const tpl = SPORT_TEMPLATES[key];
+  (tpl.matchStats || []).forEach(st => {
+    if (st.type === 'number') {
+      statSums[st.key] = matches.reduce((s, m) => s + (Number(m.stats && m.stats[st.key]) || 0), 0);
+    }
+  });
+  return { record, streak, streakResult, avgRating, statSums, totalMatches: matches.length };
+}
+
+function renderSportSection() {
+  const tpl = SPORT_TEMPLATES[currentSportKey];
+  const profile = sportProfile(currentSportKey);
+  const stats = computeSportStats(currentSportKey);
+  const container = document.getElementById('sports-content');
+
+  const positionOptions = tpl.positions ? `<option value="">Sin especificar</option>` + tpl.positions.map(p => `<option${profile.position === p ? ' selected' : ''}>${p}</option>`).join('') : null;
+
+  let html = `<div class="panel">
+    <h3>Tu perfil en ${tpl.label}</h3>
+    <div class="form-row" style="margin-top:0;">
+      <div class="field">
+        <label>Nivel</label>
+        <select id="sport-profile-level">
+          <option value="amateur"${profile.level === 'amateur' ? ' selected' : ''}>Amateur</option>
+          <option value="semi-profesional"${profile.level === 'semi-profesional' ? ' selected' : ''}>Semi-profesional</option>
+          <option value="profesional"${profile.level === 'profesional' ? ' selected' : ''}>Profesional</option>
+        </select>
+      </div>
+      ${positionOptions ? `<div class="field"><label>Posición habitual</label><select id="sport-profile-position">${positionOptions}</select></div>` : ''}
+    </div>
+    ${tpl.hasProfileClub ? `<div class="field" style="margin-top:10px;">
+      <label>Club</label>
+      <input type="text" id="sport-profile-club-search" placeholder="Buscá tu club">
+      <div id="sport-profile-club-results" class="club-results"></div>
+      <div class="hint" id="sport-profile-club-current" style="margin-top:6px;">${profile.club ? 'Club actual: ' + escapeHtml(profile.club.name) : ''}</div>
+    </div>` : ''}
+    <button type="button" class="btn secondary" id="sport-profile-save" style="margin-top:12px;">Guardar perfil</button>
+  </div>
+
+  <div class="panel">
+    <h3>Estadísticas</h3>
+    ${stats.totalMatches ? `
+      <div class="coach-note">
+        Récord: <strong>${stats.record.g}G - ${stats.record.e}E - ${stats.record.p}P</strong> en ${stats.totalMatches} partido${stats.totalMatches === 1 ? '' : 's'}.
+        ${stats.streak >= 2 ? `<br>Racha actual: ${stats.streak} ${stats.streakResult}${stats.streak === 1 ? '' : 's'} seguidos.` : ''}
+        ${stats.avgRating != null ? `<br>Autoevaluación promedio: ${stats.avgRating}/10.` : ''}
+        ${Object.keys(stats.statSums).length ? '<br>' + Object.entries(stats.statSums).map(([k, v]) => {
+          const label = (tpl.matchStats.find(s => s.key === k) || {}).label || k;
+          return `${escapeHtml(label)}: ${v}`;
+        }).join(' · ') : ''}
+      </div>` : `<div class="empty">Todavía no cargaste partidos de ${tpl.label.toLowerCase()}.</div>`}
+  </div>`;
+
+  if (tpl.hasTrainings) {
+    const trainings = sportTrainings(currentSportKey);
+    html += `<div class="panel">
+      <h3>Cargar entrenamiento</h3>
+      <div class="form-row" style="margin-top:0;">
+        <div class="field"><label>Fecha</label><input type="date" id="training-date" value="${todayStr()}"></div>
+        <div class="field"><label>RPE (esfuerzo 1-10)</label><input type="number" id="training-rpe" min="1" max="10" value="7"></div>
+        <div class="field"><label>¿Cómo te sentiste?</label>
+          <select id="training-feeling">
+            <option value="muy bien">Muy bien</option>
+            <option value="bien" selected>Bien</option>
+            <option value="regular">Regular</option>
+            <option value="mal">Mal</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px;"><label>Foco del entrenamiento</label><input type="text" id="training-focus" placeholder="Ej: scrum y contacto"></div>
+      <button type="button" class="btn secondary" id="training-add-btn" style="margin-top:10px;">Agregar entrenamiento</button>
+    </div>
+    <div class="panel">
+      <h3>Entrenamientos recientes</h3>
+      ${trainings.length ? [...trainings].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map(t => `
+        <div class="entry">
+          <div>
+            <div class="entry-name">${fmtLabel(t.date)} · RPE ${t.rpe} · ${escapeHtml(t.feeling)}</div>
+            ${t.focus ? `<div class="entry-meta">${escapeHtml(t.focus)}</div>` : ''}
+          </div>
+          <button class="del" data-remove-training="${t.id}">✕</button>
+        </div>`).join('') : '<div class="empty">Sin entrenamientos cargados todavía.</div>'}
+    </div>`;
+  }
+
+  const extra = tpl.matchExtraFields || [];
+  html += `<div class="panel">
+    <h3>Cargar partido</h3>
+    <div class="form-row" style="margin-top:0;">
+      <div class="field"><label>Fecha</label><input type="date" id="match-date" value="${todayStr()}"></div>
+      <div class="field"><label>Rival</label><input type="text" id="match-opponent" placeholder="Con quién jugaste"></div>
+      <div class="field"><label>Resultado</label>
+        <select id="match-result">
+          <option value="ganado">Ganado</option>
+          <option value="empatado">Empatado</option>
+          <option value="perdido">Perdido</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:10px;">
+      <div class="field"><label>Marcador</label><input type="text" id="match-score" placeholder="Ej: 24-17"></div>
+      <div class="field"><label>Tu autoevaluación (1-10)</label><input type="number" id="match-rating" min="1" max="10" value="7"></div>
+      ${tpl.positions ? `<div class="field"><label>Posición jugada</label><select id="match-position">${positionOptions}</select></div>` : ''}
+    </div>
+    ${extra.includes('equipo') ? `<div class="field" style="margin-top:10px;"><label>Equipo</label><input type="text" id="match-team" placeholder="Con qué equipo jugaste"></div>` : ''}
+    ${extra.includes('club') ? `<div class="field" style="margin-top:10px;">
+      <label>Club / lugar donde jugaste</label>
+      <input type="text" id="match-club-search" placeholder="Buscá el club">
+      <div id="match-club-results" class="club-results"></div>
+      <div class="hint" id="match-club-selected" style="margin-top:6px;"></div>
+    </div>` : ''}
+    ${(tpl.matchStats || []).length ? `<div class="form-row" style="margin-top:10px;">
+      ${tpl.matchStats.map(st => `<div class="field"><label>${escapeHtml(st.label)}</label><input type="${st.type === 'number' ? 'number' : 'text'}" id="match-stat-${st.key}"></div>`).join('')}
+    </div>` : ''}
+    <button type="button" class="btn" id="match-add-btn" style="margin-top:12px;">Agregar partido</button>
+  </div>
+  <div class="panel">
+    <h3>Partidos</h3>
+    ${sportMatches(currentSportKey).length ? [...sportMatches(currentSportKey)].sort((a, b) => b.date.localeCompare(a.date)).map(m => `
+      <div class="entry">
+        <div>
+          <div class="entry-name">${fmtLabel(m.date)} vs ${escapeHtml(m.opponent || '—')} · <span style="color:${m.result === 'ganado' ? 'var(--accent)' : m.result === 'perdido' ? 'var(--danger)' : 'var(--gold)'};">${m.result}</span></div>
+          <div class="entry-meta">${m.score ? m.score + ' · ' : ''}Autoevaluación ${m.selfRating}/10${m.position ? ' · ' + escapeHtml(m.position) : ''}${m.club ? ' · ' + escapeHtml(m.club.name) : ''}${m.team ? ' · ' + escapeHtml(m.team) : ''}</div>
+          ${m.stats && Object.keys(m.stats).length ? `<div class="entry-meta">${Object.entries(m.stats).map(([k, v]) => (tpl.matchStats.find(s => s.key === k) || {}).label + ': ' + v).join(' · ')}</div>` : ''}
+        </div>
+        <button class="del" data-remove-match="${m.id}">✕</button>
+      </div>`).join('') : '<div class="empty">Todavía no cargaste partidos.</div>'}
+  </div>`;
+
+  container.innerHTML = html;
+  wireSportSectionEvents(tpl);
+}
+
+function wireSportSectionEvents(tpl) {
+  sportMatchSelectedClub = null;
+  sportProfileSelectedClub = null;
+
+  if (tpl.hasProfileClub) {
+    wireClubSearch('sport-profile-club-search', 'sport-profile-club-results', (team) => {
+      sportProfileSelectedClub = { name: team.name, badgeUrl: team.badgeUrl };
+      document.getElementById('sport-profile-club-current').textContent = 'Club actual: ' + team.name;
+    });
+  }
+  document.getElementById('sport-profile-save').onclick = () => {
+    if (!state.sports.profiles[currentSportKey]) state.sports.profiles[currentSportKey] = {};
+    const profile = state.sports.profiles[currentSportKey];
+    profile.level = document.getElementById('sport-profile-level').value;
+    if (tpl.positions) profile.position = document.getElementById('sport-profile-position').value;
+    if (tpl.hasProfileClub && sportProfileSelectedClub) profile.club = sportProfileSelectedClub;
+    persistSports();
+    renderSportSection();
+  };
+
+  if (tpl.hasTrainings) {
+    document.getElementById('training-add-btn').onclick = () => {
+      if (!state.sports.trainings[currentSportKey]) state.sports.trainings[currentSportKey] = [];
+      state.sports.trainings[currentSportKey].push({
+        id: uid(),
+        date: document.getElementById('training-date').value || todayStr(),
+        rpe: Number(document.getElementById('training-rpe').value) || null,
+        feeling: document.getElementById('training-feeling').value,
+        focus: document.getElementById('training-focus').value.trim()
+      });
+      persistSports();
+      renderSportSection();
+    };
+    document.querySelectorAll('[data-remove-training]').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.removeTraining;
+        state.sports.trainings[currentSportKey] = state.sports.trainings[currentSportKey].filter(t => t.id !== id);
+        persistSports();
+        renderSportSection();
+      };
+    });
+  }
+
+  const extra = tpl.matchExtraFields || [];
+  if (extra.includes('club')) {
+    wireClubSearch('match-club-search', 'match-club-results', (team) => {
+      sportMatchSelectedClub = { name: team.name, badgeUrl: team.badgeUrl };
+      document.getElementById('match-club-selected').textContent = 'Elegiste: ' + team.name;
+    });
+  }
+  document.getElementById('match-add-btn').onclick = () => {
+    const stats = {};
+    (tpl.matchStats || []).forEach(st => {
+      const el = document.getElementById('match-stat-' + st.key);
+      if (!el || el.value === '') return;
+      stats[st.key] = st.type === 'number' ? Number(el.value) : el.value.trim();
+    });
+    const match = {
+      id: uid(),
+      date: document.getElementById('match-date').value || todayStr(),
+      opponent: document.getElementById('match-opponent').value.trim(),
+      result: document.getElementById('match-result').value,
+      score: document.getElementById('match-score').value.trim(),
+      selfRating: Number(document.getElementById('match-rating').value) || null,
+      stats
+    };
+    if (tpl.positions) match.position = document.getElementById('match-position').value;
+    if (extra.includes('equipo')) match.team = document.getElementById('match-team').value.trim();
+    if (extra.includes('club') && sportMatchSelectedClub) match.club = sportMatchSelectedClub;
+    if (!state.sports.matches[currentSportKey]) state.sports.matches[currentSportKey] = [];
+    state.sports.matches[currentSportKey].push(match);
+    persistSports();
+    renderSportSection();
+  };
+  document.querySelectorAll('[data-remove-match]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.removeMatch;
+      state.sports.matches[currentSportKey] = state.sports.matches[currentSportKey].filter(m => m.id !== id);
+      persistSports();
+      renderSportSection();
+    };
+  });
 }
 
 async function init() {
