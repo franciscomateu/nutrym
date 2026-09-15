@@ -164,7 +164,7 @@ async function processUser(userId, nutrition, gym) {
       + 'Balance del día: ' + (balance >= 0 ? 'déficit de ' + balance + ' kcal' : 'superávit de ' + Math.abs(balance) + ' kcal') + '. '
       + (whoopSummary ? 'Datos de su Whoop: ' + whoopSummary : 'No tiene datos de Whoop hoy.') + ' '
       + (patternNote ? 'Patrones detectados en sus datos: ' + patternNote + 'Si alguno de estos patrones es relevante, mencionalo con tacto (sin regañar, como un entrenador que te conoce). ' : '')
-      + 'Escribí un mensaje de notificación push breve (máximo 3 oraciones cortas, sin saludo, directo al grano) resumiendo cómo le fue hoy, mencionando el patrón detectado si hay uno relevante, y una recomendación concreta para mañana. '
+      + 'Escribí un mensaje de notificación push breve (máximo 2 oraciones cortas, sin saludo, directo al grano) resumiendo cómo le fue hoy, mencionando el patrón detectado si hay uno relevante, y una recomendación concreta para mañana. '
       + 'Si no cargó ninguna comida hoy, decíselo de forma neutral, sin regañar. Respondé SOLO el texto del mensaje, sin comillas, sin JSON.';
 
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -174,7 +174,7 @@ async function processUser(userId, nutrition, gym) {
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({ model: MODEL, max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: MODEL, max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
     });
     const aiData = await aiRes.json();
     const textBlock = (aiData.content || []).find(b => b.type === 'text');

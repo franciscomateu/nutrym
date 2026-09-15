@@ -128,6 +128,11 @@
   .macro-carbs { background: var(--gold-soft); color: #7A5A1C; }
   .macro-fat { background: var(--danger-soft); color: #6E2030; }
   .food-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .club-results { margin-top: 6px; max-height: 220px; overflow-y: auto; }
+  .club-result-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; }
+  .club-result-row:hover { background: var(--bg); }
+  .club-result-badge { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+  .club-result-badge-fallback { width: 26px; height: 26px; border-radius: 50%; background: var(--card-border); flex-shrink: 0; }
   .entry-name { font-weight: 700; }
   .entry-meta { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -367,6 +372,10 @@
       <button class="subtab active" data-actividadtab="gimnasio">Gimnasio</button>
       <button class="subtab" data-actividadtab="deporte">Deporte</button>
       <button class="subtab" data-actividadtab="otra">Otra</button>
+    </div>
+    <div id="club-badge-wrap" style="display:none; align-items:center; gap:8px; margin-bottom:12px;">
+      <div id="club-badge" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; font-family:'Manrope',sans-serif;"></div>
+      <span id="club-badge-name" class="entry-meta"></span>
     </div>
 
     <div id="actividad-gimnasio" class="actividadtabsection">
@@ -668,8 +677,34 @@
   <!-- CONFIG -->
   <section id="tab-config" class="tabsection" style="display:none;">
     <div class="panel">
+      <h3>Perfil deportivo</h3>
+      <div class="form-row" style="margin-top:0;">
+        <div class="field">
+          <label>Deporte principal</label>
+          <select id="cfg-sport">
+            <option value="">Sin especificar</option>
+            <option value="futbol">Fútbol</option>
+            <option value="rugby">Rugby</option>
+            <option value="padel">Pádel</option>
+            <option value="tenis">Tenis</option>
+            <option value="running">Running</option>
+            <option value="ciclismo">Ciclismo</option>
+            <option value="gimnasio">Gimnasio / Fitness</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Club donde jugás/entrenás</label>
+          <input type="text" id="cfg-club-search" placeholder="Buscá tu club (ej: River Plate)">
+          <div id="cfg-club-results" class="club-results"></div>
+          <div class="hint" id="cfg-club-current" style="margin-top:6px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
       <h3>Cuenta</h3>
       <button type="button" class="btn secondary" id="logout-btn">Cerrar sesión</button>
+      <button type="button" class="btn secondary" id="show-install-guide-btn" style="margin-top:8px;">Cómo instalar la app en tu celular</button>
       <div class="hint" style="margin-top:12px;">Migración única de tus datos viejos (antes de Supabase):</div>
       <button type="button" class="btn secondary" id="migrate-btn" style="margin-top:8px;">Migrar datos de JSONBin</button>
       <div class="error-box" id="migrate-status"></div>
@@ -764,6 +799,73 @@
     </div>
     <input type="range" id="compare-range" min="0" max="100" value="50" style="width:100%; margin-top:12px;">
     <div style="margin-top:12px;"><button class="btn" id="compare-photos-close">Cerrar</button></div>
+  </div>
+</div>
+
+<div id="install-guide-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">Instalá Nutrym como app</div>
+    <div id="install-guide-content" class="hint" style="margin-top:0;"></div>
+    <div style="margin-top:14px;"><button class="btn" id="install-guide-close">Listo</button></div>
+  </div>
+</div>
+
+<div id="onboarding-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-title">¡Bienvenido a Nutrym!</div>
+    <div class="hint" style="margin-top:0;">Contestá esto para arrancar con números que tengan sentido — lo podés cambiar cuando quieras en Configuración.</div>
+    <div class="field" style="margin-top:14px;">
+      <label>¿Cuál es tu objetivo?</label>
+      <select id="wizard-goal">
+        <option value="bajar">Bajar de peso</option>
+        <option value="mantener">Mantener mi peso</option>
+        <option value="ganar">Ganar masa muscular</option>
+      </select>
+    </div>
+    <div class="field" style="margin-top:10px;">
+      <label>Peso actual (kg)</label>
+      <input type="number" id="wizard-weight" min="0">
+    </div>
+    <div id="wizard-bajar-fields" style="display:none;">
+      <div class="form-row" style="margin-top:0;">
+        <div class="field"><label>¿Cuántos kg querés bajar?</label><input type="number" id="wizard-kg-bajar" min="0"></div>
+        <div class="field"><label>¿En cuántas semanas?</label><input type="number" id="wizard-weeks" min="1" value="8"></div>
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px;">
+      <label>Actividad diaria fuera del gimnasio</label>
+      <select id="wizard-activity">
+        <option value="sedentario">Sedentaria (trabajo de escritorio)</option>
+        <option value="moderado" selected>Moderada (me muevo bastante)</option>
+        <option value="activo">Activa (trabajo físico o mucho movimiento)</option>
+      </select>
+    </div>
+    <div class="form-row" style="margin-top:10px;">
+      <div class="field">
+        <label>¿Hacés algún deporte?</label>
+        <select id="wizard-sport">
+          <option value="">Sin especificar</option>
+          <option value="futbol">Fútbol</option>
+          <option value="rugby">Rugby</option>
+          <option value="padel">Pádel</option>
+          <option value="tenis">Tenis</option>
+          <option value="running">Running</option>
+          <option value="ciclismo">Ciclismo</option>
+          <option value="gimnasio">Gimnasio / Fitness</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Club donde jugás/entrenás</label>
+        <input type="text" id="wizard-club-search" placeholder="Buscá tu club (ej: River Plate)">
+        <div id="wizard-club-results" class="club-results"></div>
+        <div class="hint" id="wizard-club-selected" style="margin-top:6px;"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button type="button" class="btn secondary" id="wizard-skip">Saltear por ahora</button>
+      <button type="button" class="btn" id="wizard-confirm">Empezar</button>
+    </div>
   </div>
 </div>
 
@@ -2058,6 +2160,7 @@ function renderConfig() {
   document.getElementById('cfg-tdee-act').value = state.nutrition.settings.tdeeActivo;
   document.getElementById('cfg-deficit').value = state.nutrition.settings.deficitGoal;
   document.getElementById('cfg-height').value = state.nutrition.settings.heightCm || '';
+  document.getElementById('cfg-sport').value = state.nutrition.settings.sport || '';
   updateConfigHint();
 }
 function updateConfigHint() {
@@ -2090,6 +2193,7 @@ function renderAll() {
   renderDeporteLog();
   renderCarga();
   renderConfig();
+  renderClubBadge();
   renderProfilePhoto();
   renderWhoopStatus();
   renderWhoopVitalsStatus();
@@ -2537,13 +2641,9 @@ async function analyzePhoto(file) {
   const photoBtn = document.getElementById('photo-btn');
   photoBtn.disabled = true; photoBtn.textContent = 'Analizando foto…';
   try {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
-      reader.readAsDataURL(file);
-    });
-    const parsed = await callAiFunction({ action: 'foto', image: base64, mediaType: file.type || 'image/jpeg' });
+    const compressedDataUrl = await compressImageFile(file, 1024);
+    const base64 = compressedDataUrl.split(',')[1];
+    const parsed = await callAiFunction({ action: 'foto', image: base64, mediaType: 'image/jpeg' });
     parsed.thumbnail = await compressImageFile(file, 160).catch(() => null);
     currentPhotoSuggestion = parsed;
     document.getElementById('sugg-name').value = parsed.name || 'Comida sin nombre';
@@ -2935,6 +3035,26 @@ function renderCarga() {
 
 /* ====================== EVENTOS ====================== */
 function wireEvents() {
+  wireClubSearch('cfg-club-search', 'cfg-club-results', (team) => {
+    state.nutrition.settings.club = { name: team.name, badgeUrl: team.badgeUrl };
+    persistNutrition();
+    renderClubBadge();
+  });
+  wireClubSearch('wizard-club-search', 'wizard-club-results', (team) => {
+    wizardSelectedClub = { name: team.name, badgeUrl: team.badgeUrl };
+    document.getElementById('wizard-club-selected').textContent = 'Elegiste: ' + team.name;
+  });
+  document.getElementById('cfg-sport').onchange = () => {
+    state.nutrition.settings.sport = document.getElementById('cfg-sport').value;
+    persistNutrition();
+  };
+  document.getElementById('show-install-guide-btn').onclick = showInstallGuide;
+  document.getElementById('install-guide-close').onclick = () => {
+    document.getElementById('install-guide-overlay').style.display = 'none';
+  };
+  document.getElementById('wizard-goal').onchange = updateWizardVisibility;
+  document.getElementById('wizard-skip').onclick = () => finishOnboarding(false);
+  document.getElementById('wizard-confirm').onclick = () => finishOnboarding(true);
   document.getElementById('logout-btn').onclick = () => supabaseClient.auth.signOut();
   document.getElementById('migrate-btn').onclick = migrateFromJsonBin;
   document.getElementById('prev-day').onclick = () => { selectedDate = addDaysStr(selectedDate, -1); renderAll(); };
@@ -3312,6 +3432,144 @@ async function migrateFromJsonBin() {
   }
 }
 
+/* ====================== CLUB / INSIGNIA (búsqueda real en TheSportsDB) ====================== */
+let wizardSelectedClub = null;
+let clubSearchTimer = null;
+function wireClubSearch(inputId, resultsId, onSelect) {
+  const input = document.getElementById(inputId);
+  input.oninput = () => {
+    clearTimeout(clubSearchTimer);
+    const q = input.value.trim();
+    const results = document.getElementById(resultsId);
+    if (q.length < 3) { results.innerHTML = ''; return; }
+    clubSearchTimer = setTimeout(async () => {
+      results.innerHTML = '<div class="hint">Buscando…</div>';
+      try {
+        const res = await fetch('/.netlify/functions/club-search?q=' + encodeURIComponent(q));
+        const data = await res.json();
+        const teams = data.teams || [];
+        if (!teams.length) { results.innerHTML = '<div class="hint">No encontramos ese club — probá con otro nombre.</div>'; return; }
+        results.innerHTML = teams.map((t, i) => `
+          <div class="club-result-row" data-idx="${i}">
+            ${t.badgeUrl ? `<img src="${t.badgeUrl}" class="club-result-badge">` : '<div class="club-result-badge-fallback"></div>'}
+            <span>${escapeHtml(t.name)}${t.country ? ' <span class="entry-meta">(' + escapeHtml(t.country) + ')</span>' : ''}</span>
+          </div>`).join('');
+        results.querySelectorAll('.club-result-row').forEach(row => {
+          row.onclick = () => {
+            onSelect(teams[Number(row.dataset.idx)]);
+            results.innerHTML = '';
+            input.value = '';
+          };
+        });
+      } catch (e) {
+        results.innerHTML = '<div class="hint">No se pudo buscar. Probá de nuevo.</div>';
+      }
+    }, 400);
+  };
+}
+function renderClubBadge() {
+  const club = state.nutrition.settings.club;
+  const wrap = document.getElementById('club-badge-wrap');
+  const cfgCurrent = document.getElementById('cfg-club-current');
+  if (!club || !club.name) {
+    wrap.style.display = 'none';
+    if (cfgCurrent) cfgCurrent.textContent = '';
+    return;
+  }
+  const badge = document.getElementById('club-badge');
+  if (club.badgeUrl) {
+    badge.style.background = 'transparent';
+    badge.innerHTML = `<img src="${club.badgeUrl}" style="width:100%; height:100%; object-fit:contain;">`;
+  } else {
+    const initials = club.name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+    badge.style.background = '#9AA1A8';
+    badge.style.color = '#fff';
+    badge.innerHTML = initials;
+  }
+  document.getElementById('club-badge-name').textContent = club.name;
+  wrap.style.display = 'flex';
+  if (cfgCurrent) cfgCurrent.textContent = 'Club actual: ' + club.name;
+}
+
+/* ====================== GUÍA DE INSTALACIÓN ====================== */
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function detectPlatform() {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  return 'other';
+}
+function showInstallGuide() {
+  const platform = detectPlatform();
+  const content = document.getElementById('install-guide-content');
+  if (platform === 'ios') {
+    content.innerHTML = '1. Tocá el botón de compartir (el cuadradito con la flecha hacia arriba) en la barra de Safari.<br>2. Deslizá y elegí "Agregar a inicio".<br>3. Tocá "Agregar" arriba a la derecha.<br><br>Va a quedar como un ícono más en tu pantalla, y se abre a pantalla completa sin la barra del navegador.';
+  } else if (platform === 'android') {
+    content.innerHTML = '1. Tocá los tres puntitos (⋮) arriba a la derecha en Chrome.<br>2. Elegí "Instalar app" o "Agregar a pantalla de inicio".<br>3. Confirmá.<br><br>Va a quedar como un ícono más en tu celular, y se abre a pantalla completa.';
+  } else {
+    content.innerHTML = 'Abrí esta página desde el navegador de tu celular (Safari en iPhone, Chrome en Android) para poder instalarla como ícono en tu pantalla de inicio.';
+  }
+  document.getElementById('install-guide-overlay').style.display = 'flex';
+}
+function maybeShowInstallGuide() {
+  if (isStandalone()) return;
+  if (state.nutrition.settings.sawInstallGuide) return;
+  showInstallGuide();
+  state.nutrition.settings.sawInstallGuide = true;
+  persistNutrition();
+}
+
+/* ====================== WIZARD DE BIENVENIDA ====================== */
+function updateWizardVisibility() {
+  document.getElementById('wizard-bajar-fields').style.display =
+    document.getElementById('wizard-goal').value === 'bajar' ? 'block' : 'none';
+}
+function computeOnboardingSettings() {
+  const activityBaseline = { sedentario: 2000, moderado: 2300, activo: 2600 }[document.getElementById('wizard-activity').value] || 2200;
+  const goal = document.getElementById('wizard-goal').value;
+  let deficitGoal = 0;
+  if (goal === 'bajar') {
+    const kg = Number(document.getElementById('wizard-kg-bajar').value) || 0;
+    const weeks = Math.max(1, Number(document.getElementById('wizard-weeks').value) || 1);
+    deficitGoal = Math.round((kg * 7700) / (weeks * 7));
+  } else if (goal === 'ganar') {
+    deficitGoal = -300;
+  }
+  return {
+    tdeeSedentario: activityBaseline,
+    tdeeIntermedio: Math.round(activityBaseline * 1.07),
+    tdeeActivo: Math.round(activityBaseline * 1.14),
+    deficitGoal,
+    club: wizardSelectedClub || null,
+    onboarded: true
+  };
+}
+function isNewUser() {
+  return !state.nutrition.days || Object.keys(state.nutrition.days).length === 0;
+}
+function maybeShowOnboarding() {
+  if (!isNewUser() || state.nutrition.settings.onboarded) { maybeShowInstallGuide(); return; }
+  updateWizardVisibility();
+  document.getElementById('onboarding-overlay').style.display = 'flex';
+}
+function finishOnboarding(applyAnswers) {
+  if (applyAnswers) {
+    const computed = computeOnboardingSettings();
+    state.nutrition.settings = { ...state.nutrition.settings, ...computed };
+    const weight = Number(document.getElementById('wizard-weight').value);
+    if (!state.nutrition.weights) state.nutrition.weights = {};
+    if (weight > 0) state.nutrition.weights[todayStr()] = weight;
+  } else {
+    state.nutrition.settings.onboarded = true;
+  }
+  persistNutrition();
+  document.getElementById('onboarding-overlay').style.display = 'none';
+  renderAll();
+  maybeShowInstallGuide();
+}
+
 async function init() {
   wireEvents();
   document.getElementById('login-google-btn').onclick = async () => {
@@ -3351,6 +3609,7 @@ async function startApp() {
   setSaving('');
   renderAll();
   checkUnseenSummary();
+  maybeShowOnboarding();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }

@@ -98,7 +98,7 @@ exports.handler = async (event) => {
           text: 'Sos un nutricionista. Mirá esta foto de comida. Identificá el plato y separá el componente PRINCIPAL más difícil de estimar a ojo (generalmente la proteína: carne, pollo, pescado, milanesa, etc. — el que más varía en tamaño real) del resto de los acompañamientos (arroz, puré, ensalada, guarniciones), que sí podés estimar con más certeza a partir de la imagen. '
             + 'Para el componente principal, dame 3 opciones de tamaño usando referencias intuitivas y cotidianas (media palma de la mano, un puño cerrado, más grande que un puño, o similar — elegí las 3 referencias que más sentido tengan para ESE alimento puntual), cada una con su estimación de gramos y macros. Indicá cuál de las 3 te parece la más probable según lo que ves en la foto. '
             + 'Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown) con esta forma exacta: '
-            + '{"name": "nombre breve del plato completo en español", "mainItem": {"label": "nombre del componente principal", "sizeOptions": [{"label": "referencia intuitiva ej Media palma", "grams": numero, "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}, {"label": "...", "grams": numero, "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}, {"label": "...", "grams": numero, "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}], "bestGuessIndex": indice_0_1_o_2}, "sides": {"label": "nombre breve de los acompañamientos, o vacío si no hay", "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}, "confidence": "alta, media o baja", "note": "una frase corta aclarando el supuesto de porción usado para los acompañamientos", "comment": "un comentario nutricional breve y constructivo sobre esta comida puntual — si tiene mucha grasa, sodio o azúcar, sugerí un cambio concreto (ej: cambiar papas fritas por ensalada); si está bien balanceada, decilo también. Máximo 2 oraciones, tono cercano, nunca alarmista ni culpabilizador"}. '
+            + '{"name": "nombre breve del plato completo en español", "mainItem": {"label": "nombre del componente principal", "sizeOptions": [{"label": "referencia intuitiva ej Media palma", "grams": numero, "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}, {"label": "...", "grams": numero, "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}, {"label": "...", "grams": numero, "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}], "bestGuessIndex": indice_0_1_o_2}, "sides": {"label": "nombre breve de los acompañamientos, o vacío si no hay", "calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero}, "confidence": "alta, media o baja", "note": "una frase corta aclarando el supuesto de porción usado para los acompañamientos", "comment": "un comentario nutricional breve y constructivo sobre esta comida puntual — si tiene mucha grasa, sodio o azúcar, sugerí un cambio concreto (ej: cambiar papas fritas por ensalada); si está bien balanceada, decilo también. Máximo 1 oración corta, tono cercano, nunca alarmista ni culpabilizador"}. '
             + 'Si el plato NO tiene un componente principal ambiguo (ej: es un solo alimento simple y fácil de estimar, como una fruta entera o un producto envasado reconocible), omití "mainItem" y en su lugar devolvé directamente {"calories": numero_entero, "protein_g": numero, "carbs_g": numero, "fat_g": numero} al mismo nivel que "name", igual que antes. Si hay varios alimentos y ninguno es claramente "principal", tratá el más grande como principal. Respondé SOLO el JSON.'
         }
       ]
@@ -127,7 +127,7 @@ exports.handler = async (event) => {
     const prompt = 'Sos un entrenador de fuerza. El usuario ya decidió su propio split semanal — vos SOLO tenés que completar los ejercicios de cada día, respetando EXACTAMENTE ese plan (mismos días, mismo foco muscular por día, mismo orden). '
       + 'Plan del usuario: ' + planText + '. '
       + 'Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown) con esta forma: '
-      + '{"splitName": "nombre corto que resuma el split del usuario", "days": [{"day": "Día 1", "focus": "el mismo foco que te pasé para ese día", "exercises": [{"name": "ejercicio", "sets": numero, "reps": "rango de reps ej 8-10", "note": "tip breve opcional"}]}], "coachNote": "2-3 frases con foco de la semana"}. '
+      + '{"splitName": "nombre corto que resuma el split del usuario", "days": [{"day": "Día 1", "focus": "el mismo foco que te pasé para ese día", "exercises": [{"name": "ejercicio", "sets": numero, "reps": "rango de reps ej 8-10", "note": "tip breve opcional"}]}], "coachNote": "1-2 frases breves con foco de la semana"}. '
       + 'Reglas: 4 a 6 ejercicios por día, TODOS coherentes con el foco muscular de ESE día específico — no mezcles grupos musculares que no correspondan a ese día (ej: si el foco es "Piernas", nada de pecho o espalda ese día). Variedad realista de gimnasio. '
       + 'Los últimos entrenamientos registrados fueron: ' + (payload.recentSummary || 'sin datos') + '. '
       + 'Los splits de semanas anteriores fueron: ' + (payload.previousSplits || 'ninguna') + '; para dar variedad, evitá repetir los mismos ejercicios exactos de esas semanas cuando el foco lo permita. '
@@ -143,7 +143,7 @@ exports.handler = async (event) => {
         ? 'El usuario pregunta puntualmente: "' + payload.question + '". Respondé eso específicamente, basándote en los datos. '
         : 'Dale un análisis breve de cómo viene, qué está funcionando y qué podría ajustar. ')
       + 'Basate SOLO en los datos que te pasé, no inventes números. Si los datos son escasos o insuficientes para responder bien, decilo con honestidad y sugerí qué cargar para tener un análisis mejor la próxima vez. '
-      + 'Máximo 4-5 oraciones, sin relleno, tono cercano de entrenador que conoce a la persona. Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"answer": "tu respuesta"}. Respondé SOLO el JSON.';
+      + 'Máximo 2-3 oraciones cortas, sin relleno, tono cercano de entrenador que conoce a la persona. Respondé en JSON puro (sin texto adicional, sin backticks, sin markdown): {"answer": "tu respuesta"}. Respondé SOLO el JSON.';
     messages = [{ role: 'user', content: prompt }];
   } else {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Acción desconocida' }) };
@@ -157,7 +157,7 @@ exports.handler = async (event) => {
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1500, messages })
+      body: JSON.stringify({ model: MODEL, max_tokens: 800, messages })
     });
     if (!response.ok) {
       const errText = await response.text();
