@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bitacora-shell-v31';
+const CACHE_NAME = 'bitacora-shell-v32';
 const SHELL_FILES = [
   '/',
   '/index.html',
@@ -6,7 +6,8 @@ const SHELL_FILES = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-512-maskable.png',
-  '/icons/apple-touch-icon.png'
+  '/icons/apple-touch-icon.png',
+  '/assets/field-grass.jpg'
 ];
 
 self.addEventListener('install', (event) => {

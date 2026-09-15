@@ -62,7 +62,7 @@
   .dateinput { border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 6px 10px; font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 600; background: var(--bg); color: var(--ink); }
 
   .hero { background: var(--ink); color: var(--bg); border-radius: var(--radius); padding: 24px 22px; margin-bottom: 14px; box-shadow: 0 4px 16px rgba(20,24,28,0.18); }
-  #sports-hero { background: transparent; box-shadow: none; }
+  #sports-hero { box-shadow: 0 4px 16px rgba(20,24,28,0.28); }
   .hero-label { font-size: 12px; color: #9BA3AA; margin-bottom: 12px; text-transform: capitalize; font-weight: 600; }
   .daytype-row { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
   .daytype-row label { font-size: 11px; color: #9BA3AA; }
@@ -120,7 +120,7 @@
   #tab-actividad .panel { border-left: 3px solid var(--slate); background: linear-gradient(180deg, var(--slate-soft) 0%, var(--card) 90px); }
   #tab-historial .panel { border-left: 3px solid var(--gold); background: linear-gradient(180deg, var(--gold-soft) 0%, var(--card) 90px); }
   #tab-nutria .panel { border-left: 3px solid var(--gold); }
-  #tab-deportes .panel { border-left: 3px solid var(--danger); background: linear-gradient(180deg, var(--danger-soft) 0%, var(--card) 90px); }
+  #tab-deportes .panel { border-left: 3px solid var(--accent); background: linear-gradient(180deg, var(--accent-soft) 0%, var(--card) 90px); }
   #tab-config .panel { border-left: 3px solid var(--card-border); }
 
   .entry { display: flex; justify-content: space-between; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 8px; }
@@ -139,7 +139,7 @@
   .club-result-row:hover { background: var(--bg); }
   .club-result-badge { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
   .club-result-badge-fallback { width: 26px; height: 26px; border-radius: 50%; background: var(--card-border); flex-shrink: 0; }
-  .match-card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(20,24,28,0.04); }
+  .match-card { background: var(--card); border: 1px solid var(--card-border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(20,24,28,0.04); }
   .match-card .entry { border-bottom: none; padding: 0; }
   .match-card .entry-detail { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
   .entry-name { font-weight: 700; }
@@ -3753,13 +3753,22 @@ const SPORT_TEMPLATES = {
   }
 };
 const FIELD_BACKGROUNDS = {
-  grass: 'linear-gradient(160deg, #1B4D2E 0%, #123420 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0 36px, rgba(255,255,255,0.10) 36px 72px)',
+  grass: "linear-gradient(180deg, rgba(20,24,28,0.45), rgba(20,24,28,0.78)), url('/assets/field-grass.jpg')",
   'synthetic-blue': 'linear-gradient(160deg, #0B3D5C 0%, #0A2C42 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0 36px, rgba(255,255,255,0.09) 36px 72px)',
   clay: 'linear-gradient(160deg, #A6552E 0%, #7A3B1F 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.04) 0 36px, rgba(255,255,255,0.08) 36px 72px)',
   golf: 'linear-gradient(160deg, #2E7D42 0%, #1F5C33 40%, #123420 70%, #14181C 100%)',
   track: 'linear-gradient(160deg, #7A2E2E 0%, #591F1F 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.04) 0 36px, rgba(255,255,255,0.08) 36px 72px)',
   court: 'linear-gradient(160deg, #8A5A30 0%, #603D1E 55%, #14181C 100%)',
   turf: 'linear-gradient(160deg, #145C33 0%, #0D3D22 55%, #14181C 100%), repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0 36px, rgba(255,255,255,0.10) 36px 72px)'
+};
+const HERO_TINTS = {
+  grass: 'linear-gradient(160deg, #1B4D2E 0%, #123420 100%)',
+  'synthetic-blue': 'linear-gradient(160deg, #0B3D5C 0%, #0A2C42 100%)',
+  clay: 'linear-gradient(160deg, #A6552E 0%, #7A3B1F 100%)',
+  golf: 'linear-gradient(160deg, #2E7D42 0%, #1F5C33 100%)',
+  track: 'linear-gradient(160deg, #7A2E2E 0%, #591F1F 100%)',
+  court: 'linear-gradient(160deg, #8A5A30 0%, #603D1E 100%)',
+  turf: 'linear-gradient(160deg, #145C33 0%, #0D3D22 100%)'
 };
 let currentSportKey = 'rugby';
 let sportMatchSelectedClub = null;
@@ -3880,13 +3889,15 @@ function updateHeroVisibility() {
 }
 function applySportsHeroBackground() {
   const tpl = SPORT_TEMPLATES[currentSportKey];
-  const bg = state.photos.sportBackgrounds && state.photos.sportBackgrounds[currentSportKey];
+  const fieldType = (tpl && tpl.fieldType) || 'grass';
+  const customBg = state.photos.sportBackgrounds && state.photos.sportBackgrounds[currentSportKey];
   const backdrop = document.getElementById('deportes-backdrop');
-  const fallback = (tpl && FIELD_BACKGROUNDS[tpl.fieldType]) || FIELD_BACKGROUNDS.grass;
-  if (bg) {
-    backdrop.style.backgroundImage = `linear-gradient(180deg, rgba(20,24,28,0.55), rgba(20,24,28,0.82)), url('${bg.image}')`;
+  const hero = document.getElementById('sports-hero');
+  hero.style.backgroundImage = HERO_TINTS[fieldType] || HERO_TINTS.grass;
+  if (customBg) {
+    backdrop.style.backgroundImage = `linear-gradient(180deg, rgba(20,24,28,0.55), rgba(20,24,28,0.82)), url('${customBg.image}')`;
   } else {
-    backdrop.style.backgroundImage = fallback;
+    backdrop.style.backgroundImage = FIELD_BACKGROUNDS[fieldType] || FIELD_BACKGROUNDS.grass;
   }
 }
 function renderSportsHero() {
