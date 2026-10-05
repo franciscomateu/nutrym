@@ -2362,7 +2362,17 @@ async function whoopEnsureValidToken() {
   const w = state.gym.whoop;
   if (!w) return null;
   if (Date.now() < w.expiresAt) return w.accessToken;
-  const tokens = await callWhoopFunction({ action: 'refresh', refreshToken: w.refreshToken });
+  let tokens;
+  try {
+    tokens = await callWhoopFunction({ action: 'refresh', refreshToken: w.refreshToken });
+  } catch (e) {
+    if (/HTTP 400|invalid_grant/i.test(String(e.message))) {
+      const err = new Error('Tu conexión con Whoop venció. Tocá "Desconectar" y volvé a conectar Whoop.');
+      err.whoopExpired = true;
+      throw err;
+    }
+    throw e;
+  }
   state.gym.whoop = {
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token || w.refreshToken,
@@ -2604,7 +2614,7 @@ async function whoopFetchVitals() {
     renderWhoopVitalsStatus();
     renderSmartInsights();
   } catch (err) {
-    errorBox.textContent = 'No se pudo traer los datos de Whoop. Probá de nuevo en unos minutos.';
+    errorBox.textContent = err.whoopExpired ? err.message : 'No se pudo traer los datos de Whoop. Probá de nuevo en unos minutos.';
     errorBox.classList.add('show');
   }
   btn.disabled = false; btn.textContent = 'Actualizar';

@@ -18,7 +18,12 @@ async function getSupabaseUser(authHeader) {
   const data = await res.json();
   return data && data.id ? data : null;
 }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// Fecha en horario argentino (UTC-3), para que el límite diario se reinicie a medianoche local
+function todayStr() { return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10); }
+// Cuentas sin límite diario (admin). Configurable con la variable UNLIMITED_EMAILS (separadas por coma).
+const UNLIMITED_EMAILS = (process.env.UNLIMITED_EMAILS || 'franciscomateu994@gmail.com')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+function isUnlimited(user) { return !!(user && user.email && UNLIMITED_EMAILS.includes(String(user.email).toLowerCase())); }
 async function getUsage(userId) {
   const res = await fetch(
     process.env.SUPABASE_URL + '/rest/v1/ai_usage?user_id=eq.' + userId + '&date=eq.' + todayStr() + '&select=photo_calls,chat_calls',
@@ -80,8 +85,9 @@ exports.handler = async (event) => {
 
   const bucket = payload.action === 'foto' ? 'photo_calls' : 'chat_calls';
   const limit = payload.action === 'foto' ? PHOTO_DAILY_LIMIT : CHAT_DAILY_LIMIT;
-  const usage = await getUsage(user.id);
-  if ((usage[bucket] || 0) >= limit) {
+  const unlimited = isUnlimited(user);
+  const usage = unlimited ? { photo_calls: 0, chat_calls: 0 } : await getUsage(user.id);
+  if (!unlimited && (usage[bucket] || 0) >= limit) {
     const label = bucket === 'photo_calls' ? 'de análisis de fotos' : 'de uso de IA';
     return { statusCode: 429, headers, body: JSON.stringify({ error: `Llegaste al límite diario ${label} (${limit}/día). Probá de nuevo mañana.` }) };
   }
@@ -172,7 +178,7 @@ exports.handler = async (event) => {
     if (!textBlock) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Respuesta sin contenido de texto' }) };
     const clean = textBlock.text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
-    await incrementUsage(user.id, bucket, usage);
+    if (!unlimited) await incrementUsage(user.id, bucket, usage);
     return { statusCode: 200, headers, body: JSON.stringify(parsed) };
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Error interno', detail: String(err) }) };
