@@ -666,9 +666,6 @@
       <div class="accordion-body" id="accordion-cuenta" style="display:none;">
         <button type="button" class="btn secondary" id="logout-btn">Cerrar sesión</button>
         <button type="button" class="btn secondary" id="show-install-guide-btn" style="margin-top:8px;">Cómo instalar la app en tu celular</button>
-        <div class="hint" style="margin-top:12px;">Migración única de tus datos viejos (antes de Supabase):</div>
-        <button type="button" class="btn secondary" id="migrate-btn" style="margin-top:8px;">Migrar datos de JSONBin</button>
-        <div class="error-box" id="migrate-status"></div>
       </div>
     </div>
 
@@ -1009,14 +1006,20 @@ function syncMessageFor(e) {
   if (e && e.status === 401) return 'Sesión vencida — volvé a iniciar sesión';
   return 'No se pudo guardar — reintenta solo';
 }
+let cachedSession = null;
+supabaseClient.auth.getSession().then(r => { cachedSession = r.data && r.data.session; }).catch(() => {});
+supabaseClient.auth.onAuthStateChange((_ev, session) => { cachedSession = session; });
 async function jsonbinPut(domain, record) {
-  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-  if (userErr || !userData.user) { const err = new Error('Sin sesión activa'); err.status = 401; throw err; }
+  let session = cachedSession;
+  if (!session) {
+    try { const r = await supabaseClient.auth.getSession(); session = r.data && r.data.session; cachedSession = session; } catch (e) {}
+  }
+  if (!session || !session.user) { const err = new Error('Sin sesión activa'); err.status = 401; throw err; }
   let res;
   try {
     res = await supabaseClient
       .from('user_data')
-      .upsert({ user_id: userData.user.id, domain, data: record, updated_at: new Date().toISOString() }, { onConflict: 'user_id,domain' });
+      .upsert({ user_id: session.user.id, domain, data: record, updated_at: new Date().toISOString() }, { onConflict: 'user_id,domain' });
   } catch (networkErr) {
     const err = new Error('No se pudo contactar a Supabase: ' + networkErr.message);
     err.networkFailure = true;
@@ -1041,41 +1044,109 @@ function loadLocalCache(domain) {
     return raw ? JSON.parse(raw) : null;
   } catch (e) { return null; }
 }
+const failedSync = {};
 function markPending(domain, isPending, message) {
-  pendingSync[domain] = isPending;
-  try {
-    if (isPending) localStorage.setItem(pendingKey(domain), '1');
-    else localStorage.removeItem(pendingKey(domain));
-  } catch (e) {}
-  showOffline(pendingSync.nutrition || pendingSync.gym || pendingSync.photos || pendingSync.sports, message);
+  setPendingFlag(domain, isPending);
+  failedSync[domain] = !!isPending && !!message; // el aviso "sin conexión" solo aparece si realmente falló
+  showOffline(Object.values(failedSync).some(Boolean), message);
 }
 
-const DEBOUNCE_MS = 2500;
+const DEBOUNCE_MS = 600;
 const pendingWriteTimers = {};
+const dirtyVersion = { nutrition: 0, gym: 0, photos: 0, sports: 0 };
+const flushing = {};
+function setPendingFlag(domain, on) {
+  pendingSync[domain] = on;
+  try { if (on) localStorage.setItem(pendingKey(domain), '1'); else localStorage.removeItem(pendingKey(domain)); } catch (e) {}
+}
 async function flushDomain(domain) {
   clearTimeout(pendingWriteTimers[domain]);
   delete pendingWriteTimers[domain];
-  const record = state[domain];
-  if (!record) return;
+  if (flushing[domain]) { flushing[domain] = 'again'; return; }
+  flushing[domain] = true;
   try {
-    await jsonbinPut(domain, record);
-    markPending(domain, false);
-    setSaving('');
-  } catch (e) {
-    const message = syncMessageFor(e);
-    console.warn('Error al guardar en Supabase:', e.message);
-    markPending(domain, true, message);
-    setSaving(message);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const record = state[domain];
+      if (!record) return;
+      const v = dirtyVersion[domain];
+      try {
+        await jsonbinPut(domain, record);
+      } catch (e) {
+        const message = syncMessageFor(e);
+        console.warn('Error al guardar en Supabase:', e.message);
+        markPending(domain, true, message);
+        setSaving(message);
+        return;
+      }
+      // Solo se limpia el pendiente si NO hubo ediciones nuevas mientras guardaba
+      if (dirtyVersion[domain] === v) {
+        markPending(domain, false);
+        setSaving('Guardado ✓');
+        setTimeout(() => { if (!Object.keys(pendingWriteTimers).length && !pendingSync.nutrition && !pendingSync.gym && !pendingSync.photos && !pendingSync.sports) setSaving(''); }, 1500);
+        return;
+      }
+    }
+  } finally {
+    delete flushing[domain];
   }
 }
+// Al cerrar/ocultar la app: guardado inmediato con keepalive (sobrevive al cierre del PWA)
+function keepaliveSave(domain) {
+  const record = state[domain];
+  if (!record || !cachedSession) return false;
+  const body = JSON.stringify([{ user_id: cachedSession.user.id, domain, data: record, updated_at: new Date().toISOString() }]);
+  if (body.length > 60000) return false; // límite de keepalive ~64KB
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/user_data?on_conflict=user_id,domain', {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + cachedSession.access_token,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body
+    }).then(r => { if (r.ok && dirtyVersion[domain] === dv[domain]) markPending(domain, false); }).catch(() => {});
+    return true;
+  } catch (e) { return false; }
+}
+const dv = {};
 function flushAllPending() {
-  Object.keys(pendingWriteTimers).forEach(flushDomain);
+  ['nutrition', 'gym', 'photos', 'sports'].forEach(domain => {
+    if (!pendingSync[domain] && !pendingWriteTimers[domain]) return;
+    dv[domain] = dirtyVersion[domain];
+    clearTimeout(pendingWriteTimers[domain]);
+    delete pendingWriteTimers[domain];
+    if (!keepaliveSave(domain)) flushDomain(domain);
+  });
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAllPending(); });
 window.addEventListener('pagehide', flushAllPending);
+window.addEventListener('beforeunload', () => {
+  if (pendingSync.nutrition || pendingSync.gym || pendingSync.photos || pendingSync.sports) flushAllPending();
+});
 
+function domainSizeMetric(domain, record) {
+  if (!record) return 0;
+  if (domain === 'nutrition') return Object.keys(record.days || {}).length;
+  if (domain === 'gym') return Object.keys(record.logs || {}).length + Object.keys(record.sportLogs || {}).length;
+  if (domain === 'sports') return Object.values(record.matches || {}).reduce((s, arr) => s + (arr ? arr.length : 0), 0) + Object.values(record.trainings || {}).reduce((s, arr) => s + (arr ? arr.length : 0), 0);
+  if (domain === 'photos') return Object.keys(record.photos || {}).length + Object.keys(record.foodPhotos || {}).length;
+  return 0;
+}
+let lastKnownDomainSize = {};
 async function persistDomain(domain, record) {
+  const newSize = domainSizeMetric(domain, record);
+  const prevSize = lastKnownDomainSize[domain];
+  if (prevSize != null && prevSize >= 4 && newSize < prevSize * 0.5) {
+    const sure = confirm(`Ojo: estás por guardar bastante menos datos de ${domain} de los que ya tenías (${prevSize} → ${newSize}). ¿Seguro que querés continuar? Si no estás seguro, cancelá esto y contame qué pasó antes de seguir.`);
+    if (!sure) { renderAll(); return; }
+  }
+  lastKnownDomainSize[domain] = newSize;
   saveLocalCache(domain, record);
+  dirtyVersion[domain]++;
+  setPendingFlag(domain, true); // pendiente desde el instante de la edición: si la app se cierra, al reabrir se sube la copia local
   setSaving('Guardando…');
   clearTimeout(pendingWriteTimers[domain]);
   pendingWriteTimers[domain] = setTimeout(() => flushDomain(domain), DEBOUNCE_MS);
@@ -1086,19 +1157,11 @@ async function persistPhotos() { await persistDomain('photos', state.photos); }
 async function persistSports() { await persistDomain('sports', state.sports); }
 
 async function trySyncPending() {
-  if (pendingSync.nutrition) {
-    try { await jsonbinPut('nutrition', state.nutrition); markPending('nutrition', false); } catch (e) {}
-  }
-  if (pendingSync.gym) {
-    try { await jsonbinPut('gym', state.gym); markPending('gym', false); } catch (e) {}
-  }
-  if (pendingSync.photos) {
-    try { await jsonbinPut('photos', state.photos); markPending('photos', false); } catch (e) {}
-  }
-  if (pendingSync.sports) {
-    try { await jsonbinPut('sports', state.sports); markPending('sports', false); } catch (e) {}
+  for (const domain of ['nutrition', 'gym', 'photos', 'sports']) {
+    if (pendingSync[domain] && !flushing[domain] && state[domain]) await flushDomain(domain);
   }
 }
+setInterval(() => { if (Object.values(failedSync).some(Boolean)) trySyncPending(); }, 15000);
 window.addEventListener('online', trySyncPending);
 
 async function loadAll() {
@@ -1202,6 +1265,12 @@ async function loadAll() {
   if (!state.sports.matches) state.sports.matches = {};
   if (!state.sports.badges) state.sports.badges = [];
   if (!state.sports.enabledSports) state.sports.enabledSports = ['rugby', 'futbol', 'padel'];
+
+  // Base para el freno de seguridad de guardados — así protege desde la primera
+  // acción de la sesión, no solo después de un primer guardado exitoso.
+  ['nutrition', 'gym', 'sports', 'photos'].forEach(domain => {
+    lastKnownDomainSize[domain] = domainSizeMetric(domain, state[domain]);
+  });
 }
 
 /* ====================== NUTRICIÓN: helpers de datos ====================== */
@@ -3164,7 +3233,6 @@ function wireEvents() {
   document.getElementById('wizard-skip').onclick = () => finishOnboarding(false);
   document.getElementById('wizard-confirm').onclick = () => finishOnboarding(true);
   document.getElementById('logout-btn').onclick = () => supabaseClient.auth.signOut();
-  document.getElementById('migrate-btn').onclick = migrateFromJsonBin;
   document.getElementById('prev-day').onclick = () => { selectedDate = addDaysStr(selectedDate, -1); renderAll(); };
   document.getElementById('next-day').onclick = () => { selectedDate = addDaysStr(selectedDate, 1); renderAll(); };
   document.getElementById('date-input').onchange = (e) => { selectedDate = e.target.value; renderAll(); };
@@ -3514,26 +3582,6 @@ function renumberSets() {
 const OLD_JSONBIN_MASTER_KEY = '$2a$10$k.R5Udtn8mYhhnrwn9mPcOpEg/eo937TGhFk48UdrUQx9BRxzfh0W';
 const OLD_JSONBIN_BASE = 'https://api.jsonbin.io/v3/b/';
 const OLD_BIN_IDS = { nutrition: '6aa157a0ffd5d16053f1a727', gym: '6aa157afac6210605ab8076a', photos: '6aa44f42ffd5d16053fb7201' };
-async function migrateFromJsonBin() {
-  const status = document.getElementById('migrate-status');
-  status.classList.add('show');
-  status.textContent = 'Migrando…';
-  try {
-    for (const domain of ['nutrition', 'gym', 'photos']) {
-      const res = await fetch(OLD_JSONBIN_BASE + OLD_BIN_IDS[domain] + '/latest', { headers: { 'X-Master-Key': OLD_JSONBIN_MASTER_KEY } });
-      if (!res.ok) throw new Error('No se pudo leer ' + domain + ' de JSONBin (' + res.status + ')');
-      const record = (await res.json()).record;
-      await jsonbinPut(domain, record);
-      state[domain] = record;
-      saveLocalCache(domain, record);
-    }
-    status.textContent = '¡Listo! Tus datos viejos ya están en tu cuenta nueva.';
-    renderAll();
-  } catch (e) {
-    status.textContent = 'Error en la migración: ' + e.message;
-    console.warn(e);
-  }
-}
 
 /* ====================== CLUB / INSIGNIA (búsqueda real en TheSportsDB) ====================== */
 let wizardSelectedClub = null;
