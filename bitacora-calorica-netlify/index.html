@@ -964,7 +964,7 @@ function getMonday(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
-const APP_VERSION = 'v29';
+const APP_VERSION = 'v30';
 function setSaving(msg) { document.getElementById('saving-indicator').textContent = msg || ('Nutrym ' + APP_VERSION); }
 function showOffline(show, message) {
   const el = document.getElementById('offline-badge');
@@ -1224,6 +1224,7 @@ async function loadAll() {
   if (!state.gym.whoopImportedIds) state.gym.whoopImportedIds = [];
   if (!state.gym.whoopHistory) state.gym.whoopHistory = {};
   if (!state.gym.whoopWorkoutPool) state.gym.whoopWorkoutPool = [];
+  if (!state.gym.whoopDismissedIds) state.gym.whoopDismissedIds = [];
 
   // Fotos de progreso
   const localPhotosPending = localStorage.getItem(pendingKey('photos')) === '1';
@@ -1323,8 +1324,30 @@ function addActivity(dateStr, act) {
 }
 function removeActivity(dateStr, id) {
   const d = ensureDay(dateStr);
+  const removed = d.activities.find(a => a.id === id);
   d.activities = d.activities.filter(a => a.id !== id);
   persistNutrition();
+  // Si borraste a propósito un entrenamiento de Whoop, no lo volvemos a agregar solo al sincronizar
+  if (removed && removed.whoopId) {
+    if (!state.gym.whoopDismissedIds) state.gym.whoopDismissedIds = [];
+    if (!state.gym.whoopDismissedIds.includes(removed.whoopId)) { state.gym.whoopDismissedIds.push(removed.whoopId); persistGym(); }
+  }
+}
+// Asegura que un entrenamiento de Whoop esté sumado como actividad en su día (autoreparable:
+// si el registro se perdió o nunca se creó, se vuelve a crear). Devuelve true si lo agregó.
+function ensureWhoopActivity(w, force) {
+  if (!w || !w.id || !w.date) return false;
+  if (!state.gym.whoopDismissedIds) state.gym.whoopDismissedIds = [];
+  if (force) state.gym.whoopDismissedIds = state.gym.whoopDismissedIds.filter(x => x !== w.id);
+  else if (state.gym.whoopDismissedIds.includes(w.id)) return false;
+  const d = state.nutrition.days[w.date];
+  const has = d && (d.activities || []).some(a => a.whoopId === w.id ||
+    (a.source === 'whoop' && !a.whoopId && Number(a.calories) === Number(w.kcal) && Number(a.duration) === Number(w.durationMin)));
+  if (has) return false;
+  addActivity(w.date, { name: 'Entrenamiento Whoop', calories: w.kcal, duration: w.durationMin, source: 'whoop', whoopId: w.id });
+  if (!state.gym.whoopImportedIds.includes(w.id)) state.gym.whoopImportedIds.push(w.id);
+  persistGym();
+  return true;
 }
 function setWeight(dateStr, kg) {
   state.nutrition.weights[dateStr] = kg;
@@ -2418,13 +2441,18 @@ async function whoopSync() {
             maxHr: r.score.max_heart_rate || null
           });
         }
+        // reparación: si el entrenamiento figura importado pero su actividad del día no existe (p. ej. por datos perdidos), se recrea
+        if (r.score_state === 'SCORED' && r.score) {
+          const pw = state.gym.whoopWorkoutPool.find(w => w.id === r.id);
+          if (pw && ensureWhoopActivity(pw)) imported++;
+        }
         return;
       }
       if (r.score_state !== 'SCORED' || !r.score) { notScored++; return; }
       const dateStr = isoToLocalDateStr(r.start);
       const durationMin = Math.round((new Date(r.end) - new Date(r.start)) / 60000);
       const kcal = r.score.kilojoule != null ? Math.round(r.score.kilojoule / 4.184) : 0;
-      addActivity(dateStr, { name: 'Entrenamiento Whoop (tipo #' + r.sport_id + ')', calories: kcal, duration: durationMin, source: 'whoop' });
+      addActivity(dateStr, { name: 'Entrenamiento Whoop (tipo #' + r.sport_id + ')', calories: kcal, duration: durationMin, source: 'whoop', whoopId: r.id });
       state.gym.whoopImportedIds.push(r.id);
       if (!state.gym.whoopWorkoutPool) state.gym.whoopWorkoutPool = [];
       state.gym.whoopWorkoutPool.push({
@@ -4287,6 +4315,7 @@ function wireSportSectionEvents(tpl) {
     }
     document.getElementById('training-add-btn').onclick = () => {
       const whoopSel = getWhoopLinkData('training-whoop-link');
+      if (whoopSel) ensureWhoopActivity(whoopSel, true);
       const trainingData = {
         date: document.getElementById('training-date').value || todayStr(),
         rpe: Number(document.getElementById('training-rpe').value) || null,
@@ -4309,6 +4338,7 @@ function wireSportSectionEvents(tpl) {
       }
       persistSports();
       renderSportSection();
+      if (whoopSel) renderAll();
     };
     const trainingCancelBtn = document.getElementById('training-cancel-edit');
     if (trainingCancelBtn) trainingCancelBtn.onclick = () => { editingTrainingId = null; renderSportSection(); };
@@ -4378,6 +4408,7 @@ function wireSportSectionEvents(tpl) {
       stats[st.key] = st.type === 'number' ? Number(el.value) : el.value.trim();
     });
     const whoopSel = getWhoopLinkData('match-whoop-link');
+    if (whoopSel) ensureWhoopActivity(whoopSel, true);
     const matchData = {
       date: document.getElementById('match-date').value || todayStr(),
       result: document.getElementById('match-result').value,
@@ -4415,6 +4446,7 @@ function wireSportSectionEvents(tpl) {
     }
     persistSports();
     renderSportSection();
+    if (whoopSel) renderAll();
   };
   const matchCancelBtn = document.getElementById('match-cancel-edit');
   if (matchCancelBtn) matchCancelBtn.onclick = () => { editingMatchId = null; renderSportSection(); };
