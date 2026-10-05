@@ -964,7 +964,8 @@ function getMonday(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
-function setSaving(msg) { document.getElementById('saving-indicator').textContent = msg || '\u00A0'; }
+const APP_VERSION = 'v29';
+function setSaving(msg) { document.getElementById('saving-indicator').textContent = msg || ('Nutrym ' + APP_VERSION); }
 function showOffline(show, message) {
   const el = document.getElementById('offline-badge');
   if (message) el.textContent = message;
@@ -1081,8 +1082,7 @@ async function flushDomain(domain) {
       // Solo se limpia el pendiente si NO hubo ediciones nuevas mientras guardaba
       if (dirtyVersion[domain] === v) {
         markPending(domain, false);
-        setSaving('Guardado ✓');
-        setTimeout(() => { if (!Object.keys(pendingWriteTimers).length && !pendingSync.nutrition && !pendingSync.gym && !pendingSync.photos && !pendingSync.sports) setSaving(''); }, 1500);
+        { const n = new Date(); setSaving('Guardado ✓ ' + String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0') + ' · ' + APP_VERSION); }
         return;
       }
     }
