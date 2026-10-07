@@ -658,6 +658,8 @@
       <div class="accordion-body" id="accordion-perfil" style="display:none;">
         <div class="hint" id="cfg-profile-name" style="margin-top:0;"></div>
         <div class="hint" id="cfg-profile-email"></div>
+        <button class="btn secondary" id="export-backup-btn" type="button" style="margin-top:14px;">Descargar copia de seguridad</button>
+        <div class="hint">Baja un archivo con todos tus datos tal como están en este dispositivo.</div>
       </div>
     </div>
 
@@ -964,7 +966,7 @@ function getMonday(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
-const APP_VERSION = 'v30';
+const APP_VERSION = 'v31';
 function setSaving(msg) { document.getElementById('saving-indicator').textContent = msg || ('Nutrym ' + APP_VERSION); }
 function showOffline(show, message) {
   const el = document.getElementById('offline-badge');
@@ -986,7 +988,7 @@ async function jsonbinGet(domain) {
   try {
     res = await supabaseClient
       .from('user_data')
-      .select('data')
+      .select('data,updated_at')
       .eq('user_id', userData.user.id)
       .eq('domain', domain)
       .maybeSingle();
@@ -1000,9 +1002,16 @@ async function jsonbinGet(domain) {
     err.status = 500;
     throw err;
   }
+  lastServerTs[domain] = res.data ? res.data.updated_at : null;
   return res.data ? res.data.data : {};
 }
+const lastServerTs = {};
+function syncedKey(domain) { return 'bc_synced_' + domain; }
+function getSynced(domain) { try { return localStorage.getItem(syncedKey(domain)); } catch (e) { return null; } }
+function setSynced(domain, ts) { try { if (ts) localStorage.setItem(syncedKey(domain), ts); } catch (e) {} }
+function sameTs(a, b) { return !!a && !!b && Math.abs(Date.parse(a) - Date.parse(b)) < 5; }
 function syncMessageFor(e) {
+  if (e && e.conflict) return 'Otro dispositivo guardó cambios — cerrá y reabrí la app para sincronizar';
   if (e && e.networkFailure) return 'No se pudo conectar con el servidor — guardando local';
   if (e && e.status === 401) return 'Sesión vencida — volvé a iniciar sesión';
   return 'No se pudo guardar — reintenta solo';
@@ -1010,17 +1019,31 @@ function syncMessageFor(e) {
 let cachedSession = null;
 supabaseClient.auth.getSession().then(r => { cachedSession = r.data && r.data.session; }).catch(() => {});
 supabaseClient.auth.onAuthStateChange((_ev, session) => { cachedSession = session; });
-async function jsonbinPut(domain, record) {
+async function jsonbinPut(domain, record, opts) {
   let session = cachedSession;
   if (!session) {
     try { const r = await supabaseClient.auth.getSession(); session = r.data && r.data.session; cachedSession = session; } catch (e) {}
   }
   if (!session || !session.user) { const err = new Error('Sin sesión activa'); err.status = 401; throw err; }
+  // Candado: si OTRO dispositivo guardó algo desde la última vez que este lo vio, no pisamos su trabajo.
+  const knownTs = getSynced(domain);
+  if (knownTs && !(opts && opts.force)) {
+    let chk;
+    try {
+      chk = await supabaseClient.from('user_data').select('updated_at').eq('user_id', session.user.id).eq('domain', domain).maybeSingle();
+    } catch (networkErr) {
+      const err = new Error('No se pudo contactar a Supabase: ' + networkErr.message); err.networkFailure = true; throw err;
+    }
+    if (chk.data && chk.data.updated_at && Date.parse(chk.data.updated_at) > Date.parse(knownTs) + 5) {
+      const err = new Error('conflicto: otro dispositivo guardó cambios en ' + domain); err.conflict = true; throw err;
+    }
+  }
+  const ts = new Date().toISOString();
   let res;
   try {
     res = await supabaseClient
       .from('user_data')
-      .upsert({ user_id: session.user.id, domain, data: record, updated_at: new Date().toISOString() }, { onConflict: 'user_id,domain' });
+      .upsert({ user_id: session.user.id, domain, data: record, updated_at: ts }, { onConflict: 'user_id,domain' });
   } catch (networkErr) {
     const err = new Error('No se pudo contactar a Supabase: ' + networkErr.message);
     err.networkFailure = true;
@@ -1031,6 +1054,7 @@ async function jsonbinPut(domain, record) {
     err.status = 500;
     throw err;
   }
+  setSynced(domain, ts);
   return true;
 }
 
@@ -1074,6 +1098,7 @@ async function flushDomain(domain) {
         await jsonbinPut(domain, record);
       } catch (e) {
         const message = syncMessageFor(e);
+        if (e && e.conflict) conflictDomains[domain] = true;
         console.warn('Error al guardar en Supabase:', e.message);
         markPending(domain, true, message);
         setSaving(message);
@@ -1093,8 +1118,9 @@ async function flushDomain(domain) {
 // Al cerrar/ocultar la app: guardado inmediato con keepalive (sobrevive al cierre del PWA)
 function keepaliveSave(domain) {
   const record = state[domain];
-  if (!record || !cachedSession) return false;
-  const body = JSON.stringify([{ user_id: cachedSession.user.id, domain, data: record, updated_at: new Date().toISOString() }]);
+  if (!record || !cachedSession || conflictDomains[domain]) return false;
+  const kaTs = new Date().toISOString();
+  const body = JSON.stringify([{ user_id: cachedSession.user.id, domain, data: record, updated_at: kaTs }]);
   if (body.length > 60000) return false; // límite de keepalive ~64KB
   try {
     fetch(SUPABASE_URL + '/rest/v1/user_data?on_conflict=user_id,domain', {
@@ -1107,11 +1133,12 @@ function keepaliveSave(domain) {
         'Prefer': 'resolution=merge-duplicates,return=minimal'
       },
       body
-    }).then(r => { if (r.ok && dirtyVersion[domain] === dv[domain]) markPending(domain, false); }).catch(() => {});
+    }).then(r => { if (r.ok) { setSynced(domain, kaTs); if (dirtyVersion[domain] === dv[domain]) markPending(domain, false); } }).catch(() => {});
     return true;
   } catch (e) { return false; }
 }
 const dv = {};
+const conflictDomains = {};
 function flushAllPending() {
   ['nutrition', 'gym', 'photos', 'sports'].forEach(domain => {
     if (!pendingSync[domain] && !pendingWriteTimers[domain]) return;
@@ -1164,24 +1191,63 @@ async function trySyncPending() {
 setInterval(() => { if (Object.values(failedSync).some(Boolean)) trySyncPending(); }, 15000);
 window.addEventListener('online', trySyncPending);
 
+/* ====================== CARGA SEGURA: nunca pisar datos más completos ====================== */
+function saveBackup(domain, record, reason) {
+  try { localStorage.setItem('bc_backup_' + domain, JSON.stringify({ ts: new Date().toISOString(), reason, data: record })); } catch (e) {}
+}
+const DOMAIN_LABEL = { nutrition: 'alimentación', gym: 'gimnasio', sports: 'deportes', photos: 'fotos' };
+async function loadDomain(domain, current) {
+  const cached = loadLocalCache(domain);
+  const pending = localStorage.getItem(pendingKey(domain)) === '1';
+  let server, serverTs;
+  try {
+    server = await jsonbinGet(domain);
+    serverTs = lastServerTs[domain];
+  } catch (e) {
+    if (cached) { markPending(domain, true, syncMessageFor(e)); console.warn('Error al cargar ' + domain + ':', e.message); return cached; }
+    return current;
+  }
+  const synced = getSynced(domain);
+  const serverEmpty = !server || Object.keys(server).length === 0;
+  const serverChanged = !!(synced && serverTs && !sameTs(serverTs, synced));
+  const localLen = cached ? JSON.stringify(cached).length : 0;
+  const serverLen = serverEmpty ? 0 : JSON.stringify(server).length;
+  const localRicher = localLen > serverLen * 1.05;
+  let chosen = server, pushLocal = false, loser = null, reason = '';
+  if (!cached) {
+    chosen = server;
+  } else if (serverEmpty) {
+    chosen = cached; pushLocal = true;
+  } else if (pending && synced && !serverChanged) {
+    chosen = cached; pushLocal = true;                       // caso normal: cambios míos todavía sin subir
+  } else if (pending && !synced) {
+    if (localRicher) { chosen = cached; pushLocal = true; loser = server; reason = 'servidor con menos datos'; }
+    else { chosen = server; loser = cached; reason = 'copia local pendiente con menos datos'; }
+  } else if (localRicher && (serverChanged || !synced)) {
+    const lm = domainSizeMetric(domain, cached), sm = domainSizeMetric(domain, server);
+    const restore = confirm(`Este dispositivo tiene más datos de ${DOMAIN_LABEL[domain] || domain} que la nube (${lm} registros vs ${sm}). Puede que otro dispositivo los haya pisado.\n\nAceptar = recuperar los de este dispositivo y subirlos a la nube.\nCancelar = quedarme con los de la nube (los de este dispositivo quedan guardados como respaldo).`);
+    if (restore) { chosen = cached; pushLocal = true; loser = server; reason = 'restaurado desde este dispositivo'; }
+    else { chosen = server; loser = cached; reason = 'elegiste la nube'; }
+  } else {
+    chosen = server;
+    if (cached && (pending || serverChanged)) { loser = cached; reason = 'cambió en la nube'; }
+  }
+  if (loser) saveBackup(domain, loser, reason);
+  if (pushLocal) {
+    try { await jsonbinPut(domain, chosen, { force: true }); markPending(domain, false); }
+    catch (e) { markPending(domain, true, syncMessageFor(e)); }
+  } else {
+    markPending(domain, false);
+    setSynced(domain, serverTs);
+  }
+  saveLocalCache(domain, chosen);
+  return chosen;
+}
+
 async function loadAll() {
-  const localNutritionPending = localStorage.getItem(pendingKey('nutrition')) === '1';
-  const localGymPending = localStorage.getItem(pendingKey('gym')) === '1';
 
   // Nutrición
-  try {
-    if (localNutritionPending) {
-      const cached = loadLocalCache('nutrition');
-      if (cached) { await jsonbinPut('nutrition', cached); markPending('nutrition', false); state.nutrition = cached; }
-      else state.nutrition = await jsonbinGet('nutrition');
-    } else {
-      state.nutrition = await jsonbinGet('nutrition');
-    }
-    saveLocalCache('nutrition', state.nutrition);
-  } catch (e) {
-    const cached = loadLocalCache('nutrition');
-    if (cached) { state.nutrition = cached; markPending('nutrition', true, syncMessageFor(e)); console.warn('Error al cargar nutrición desde JSONBin:', e.message); }
-  }
+  state.nutrition = await loadDomain('nutrition', state.nutrition);
   if (!state.nutrition.settings) state.nutrition.settings = DEFAULT_SETTINGS;
   // migración: si venía del esquema viejo de un solo TDEE
   if (state.nutrition.settings.tdee != null && state.nutrition.settings.tdeeSedentario == null) {
@@ -1201,19 +1267,7 @@ async function loadAll() {
   if (state.nutrition.settings.heightCm === undefined) state.nutrition.settings.heightCm = null;
 
   // Gimnasio
-  try {
-    if (localGymPending) {
-      const cached = loadLocalCache('gym');
-      if (cached) { await jsonbinPut('gym', cached); markPending('gym', false); state.gym = cached; }
-      else state.gym = await jsonbinGet('gym');
-    } else {
-      state.gym = await jsonbinGet('gym');
-    }
-    saveLocalCache('gym', state.gym);
-  } catch (e) {
-    const cached = loadLocalCache('gym');
-    if (cached) { state.gym = cached; markPending('gym', true, syncMessageFor(e)); console.warn('Error al cargar gym desde JSONBin:', e.message); }
-  }
+  state.gym = await loadDomain('gym', state.gym);
   if (!state.gym.exercises || !state.gym.exercises.length) state.gym.exercises = DEFAULT_EXERCISES;
   if (!state.gym.logs) state.gym.logs = {};
   if (state.gym.routineHistory === undefined) state.gym.routineHistory = [];
@@ -1227,40 +1281,14 @@ async function loadAll() {
   if (!state.gym.whoopDismissedIds) state.gym.whoopDismissedIds = [];
 
   // Fotos de progreso
-  const localPhotosPending = localStorage.getItem(pendingKey('photos')) === '1';
-  try {
-    if (localPhotosPending) {
-      const cached = loadLocalCache('photos');
-      if (cached) { await jsonbinPut('photos', cached); markPending('photos', false); state.photos = cached; }
-      else state.photos = await jsonbinGet('photos');
-    } else {
-      state.photos = await jsonbinGet('photos');
-    }
-    saveLocalCache('photos', state.photos);
-  } catch (e) {
-    const cached = loadLocalCache('photos');
-    if (cached) { state.photos = cached; markPending('photos', true, syncMessageFor(e)); console.warn('Error al cargar fotos desde JSONBin:', e.message); }
-  }
+  state.photos = await loadDomain('photos', state.photos);
   if (!state.photos.photos) state.photos.photos = {};
   if (!state.photos.foodPhotos) state.photos.foodPhotos = {};
   if (!state.photos.sportPhotos) state.photos.sportPhotos = {};
   if (!state.photos.sportBackgrounds) state.photos.sportBackgrounds = {};
 
   // Perfil deportivo
-  const localSportsPending = localStorage.getItem(pendingKey('sports')) === '1';
-  try {
-    if (localSportsPending) {
-      const cached = loadLocalCache('sports');
-      if (cached) { await jsonbinPut('sports', cached); markPending('sports', false); state.sports = cached; }
-      else state.sports = await jsonbinGet('sports');
-    } else {
-      state.sports = await jsonbinGet('sports');
-    }
-    saveLocalCache('sports', state.sports);
-  } catch (e) {
-    const cached = loadLocalCache('sports');
-    if (cached) { state.sports = cached; markPending('sports', true, syncMessageFor(e)); console.warn('Error al cargar deportes desde Supabase:', e.message); }
-  }
+  state.sports = await loadDomain('sports', state.sports);
   if (!state.sports.profiles) state.sports.profiles = {};
   if (!state.sports.trainings) state.sports.trainings = {};
   if (!state.sports.matches) state.sports.matches = {};
@@ -4498,6 +4526,14 @@ async function startApp() {
       navigator.clipboard.writeText(user.id).catch(() => {});
     };
   }
+  document.getElementById('export-backup-btn').onclick = () => {
+    const out = { exportedAt: new Date().toISOString(), app: APP_VERSION, nutrition: state.nutrition, gym: state.gym, sports: state.sports, photos: state.photos, respaldos: {} };
+    ['nutrition', 'gym', 'sports', 'photos'].forEach(d => { try { const b = localStorage.getItem('bc_backup_' + d); if (b) out.respaldos[d] = JSON.parse(b); } catch (e) {} });
+    const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'nutrym-respaldo-' + todayStr() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
   setSaving('Cargando…');
   await loadAll();
   renderSportsSubtabs();
